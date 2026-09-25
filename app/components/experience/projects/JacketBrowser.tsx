@@ -34,9 +34,9 @@ const BURST_AT = 2;
 // and scaled to the screen. warpY/restY are where the card sits during and after the finale.
 const LAYOUT = isMobile ? {
   position: [0, 1.55, -1] as [number, number, number],
-  card: [0, 3.46] as [number, number],
-  controls: [0, -1.28] as [number, number],
-  cardScale: 0.62,
+  card: [0, 3.66] as [number, number],
+  controls: [0, -1.4] as [number, number],
+  cardScale: 0.8,
   warpY: 0,
   restY: -0.7,
   reservedY: 2.15,
@@ -55,7 +55,7 @@ const CARD_CENTER = LAYOUT.card[0];
 
 // What the phone camera sees at the shop's depth, in world units, and the stack it has to fit.
 const PHONE_VIEW_HEIGHT = 5.3;
-const PHONE_STACK: [number, number] = [3.4, 10.1];
+const PHONE_STACK: [number, number] = [3.4, 10.7];
 const phoneScale = (aspect: number) => Math.min(
   (PHONE_VIEW_HEIGHT * 0.97) / PHONE_STACK[1],
   (PHONE_VIEW_HEIGHT * aspect) / PHONE_STACK[0],
@@ -476,12 +476,17 @@ const Reserved = () => {
   const headline = useOrderStore((state) => state.headline);
 
   useEffect(() => {
-    if (status !== 'sent' || !ref.current) return;
+    if (!ref.current) return;
+    if (status !== 'sent') {
+      ref.current.scale.setScalar(0.001);
+      return;
+    }
     const tl = gsap.timeline({ delay: BURST_AT + 0.15 });
     const s = LAYOUT.reservedScale;
     tl.fromTo(ref.current.scale, { x: 0.001, y: 0.001, z: 0.001 }, { x: s, y: s, z: s, duration: 0.01 })
       .fromTo(titleRef.current, { letterSpacing: 1.2, fillOpacity: 0 }, { letterSpacing: 0.28, fillOpacity: 1, duration: 1.8, ease: 'expo.out' })
       .fromTo(lineRef.current!.scale, { x: 0 }, { x: 1, duration: 1.2, ease: 'power3.inOut' }, '-=1.2');
+    return () => { tl.kill(); };
   }, [status]);
 
   return (
@@ -523,11 +528,34 @@ const JacketBrowser = () => {
   const aspect = useThree((state) => state.size.width / state.size.height);
   const scale = isMobile ? phoneScale(aspect) : 0.86;
 
+  // Rises and grows in once the portal opens, the same way the story's timeline does.
   useEffect(() => {
     if (!groupRef.current) return;
-    const s = scale * (isActive ? 1 : 0.9);
-    gsap.to(groupRef.current.scale, { x: s, y: s, z: s, duration: 1 });
+    const s = isActive ? scale : 0;
+    gsap.to(groupRef.current.scale, { x: s, y: s, z: s, duration: 1, delay: isActive ? 0.4 : 0, ease: 'power3.out' });
+    gsap.to(groupRef.current.position, { y: LAYOUT.position[1] - (isActive ? 0 : 2), duration: 1, delay: isActive ? 0.4 : 0, ease: 'power3.out' });
   }, [isActive, scale]);
+
+  // Leaving after the finale puts the shop back together, so coming back in starts fresh.
+  useEffect(() => {
+    if (isActive || status !== 'sent') return;
+    const timer = setTimeout(() => {
+      useOrderStore.getState().setStatus('idle', '', 'RESERVED');
+      setPanelGone(false);
+      resetFinale();
+      if (controlsSlot.current) {
+        gsap.killTweensOf([controlsSlot.current.position, controlsSlot.current.rotation]);
+        controlsSlot.current.position.set(LAYOUT.controls[0], LAYOUT.controls[1], 0);
+        controlsSlot.current.rotation.set(0, 0, 0);
+      }
+      if (cardSlot.current) {
+        gsap.killTweensOf([cardSlot.current.position, cardSlot.current.scale]);
+        cardSlot.current.position.set(LAYOUT.card[0], LAYOUT.card[1], 0);
+        cardSlot.current.scale.setScalar(LAYOUT.cardScale);
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [isActive, status]);
 
   useEffect(() => {
     if (isActive) setTheme(color === 'Maroon' ? 'maroon' : 'black');
@@ -577,8 +605,8 @@ const JacketBrowser = () => {
 
   return (
     <group ref={groupRef}
-      position={LAYOUT.position}
-      scale={scale}>
+      position={[LAYOUT.position[0], LAYOUT.position[1] - 2, LAYOUT.position[2]]}
+      scale={0}>
       <group visible={isActive}>
         <Petals mode="drift" count={70} bounds={[16, 10, 8]} size={0.14} />
       </group>

@@ -17,6 +17,10 @@ const IVORY = '#F4EFE6';
 const TOP = -10.5;
 const BOTTOM = -21.5;
 const HEIGHT = 1.9;
+// A phone sees about a third of a laptop's width at the same distance, so the same composition
+// is shrunk to fit it: photos and words by PHONE_SCALE, their spread from the middle by PHONE_SPREAD.
+const PHONE_SCALE = isMobile ? 0.36 : 1;
+const PHONE_SPREAD = isMobile ? 0.3 : 1;
 
 const Shot = ({ shot, index, count }: { shot: ProgressShot, index: number, count: number }) => {
   const groupRef = useRef<THREE.Group>(null);
@@ -28,14 +32,12 @@ const Shot = ({ shot, index, count }: { shot: ProgressShot, index: number, count
 
   const layout = useMemo(() => {
     const side = index % 2 === 0 ? -1 : 1;
-    const width = isMobile
-      ? Math.min(1.15, 1.05 * shot.aspect)
-      : Math.min(HEIGHT * shot.aspect, 3.2);
+    const width = Math.min(HEIGHT * shot.aspect, 3.2);
     const height = width / shot.aspect;
     return {
       y: TOP + (BOTTOM - TOP) * (index / Math.max(1, count - 1)),
-      x: side * (isMobile ? 0.22 : 1.1 + width * 0.3),
-      z: 5 + (index % 3 - 1) * 0.35,
+      x: side * (1.1 + width * 0.3) * PHONE_SPREAD,
+      z: 5 + (index % 3 - 1) * 0.35 * PHONE_SCALE,
       tilt: side * 0.05,
       lean: side * -0.18,
       width,
@@ -48,16 +50,12 @@ const Shot = ({ shot, index, count }: { shot: ProgressShot, index: number, count
     if (!groupRef.current) return;
     const above = camera.position.y - layout.y;
     // Faint from far off, gaining slowly as the camera nears, full just before it's passed.
-    // A phone's narrow view crops anything close, so there each shot peaks further away.
-    const approach = isMobile
-      ? 1 - THREE.MathUtils.smoothstep(above, 3.2, 5)
-      : 1 - THREE.MathUtils.smoothstep(above, 1.8, 10);
-    const reveal = (isMobile ? THREE.MathUtils.smoothstep(above, 1.9, 2.7) : THREE.MathUtils.smoothstep(above, 0.15, 0.9)) * approach * approach;
-    const read = isMobile
-      ? THREE.MathUtils.smoothstep(above, 2.2, 3) * (1 - THREE.MathUtils.smoothstep(above, 4.2, 5.6))
-      : THREE.MathUtils.smoothstep(above, 0.8, 2.4) * (1 - THREE.MathUtils.smoothstep(above, 5.5, 8));
+    const approach = 1 - THREE.MathUtils.smoothstep(above, 1.8, 10);
+    const reveal = THREE.MathUtils.smoothstep(above, 0.15, 0.9) * approach * approach;
+    // A phone crops the words of a shot that's right on top of it, so they leave a little sooner there.
+    const read = THREE.MathUtils.smoothstep(above, isMobile ? 1.5 : 0.8, isMobile ? 2.6 : 2.4) * (1 - THREE.MathUtils.smoothstep(above, 5.5, 8));
 
-    groupRef.current.position.x = layout.x + Math.sin(clock.elapsedTime * 0.4 + index) * 0.05;
+    groupRef.current.position.x = layout.x + Math.sin(clock.elapsedTime * 0.4 + index) * 0.05 * PHONE_SCALE;
     groupRef.current.position.y = layout.y + Math.sin(clock.elapsedTime * 0.3 + index * 2) * 0.08;
 
     if (photoRef.current) photoRef.current.opacity = reveal;
@@ -69,13 +67,14 @@ const Shot = ({ shot, index, count }: { shot: ProgressShot, index: number, count
   });
 
   // Captions hang from the edge nearest the middle of the screen so they never run off it.
-  const textAnchor = isMobile ? 'center' : layout.side < 0 ? 'right' : 'left';
-  const textX = isMobile ? 0 : layout.side < 0 ? layout.width / 2 : -layout.width / 2;
+  const textAnchor = layout.side < 0 ? 'right' : 'left';
+  const textX = layout.side < 0 ? layout.width / 2 : -layout.width / 2;
 
   return (
     <group ref={groupRef}
       position={[layout.x, layout.y, layout.z]}
-      rotation={[-Math.PI / 2 + layout.lean, 0, layout.tilt]}>
+      rotation={[-Math.PI / 2 + layout.lean, 0, layout.tilt]}
+      scale={PHONE_SCALE}>
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[layout.width + 0.06, layout.height + 0.06]} />
         <meshBasicMaterial ref={frameRef} color={GOLD} transparent opacity={0} depthWrite={false} />
@@ -86,25 +85,25 @@ const Shot = ({ shot, index, count }: { shot: ProgressShot, index: number, count
       </mesh>
       <Text ref={titleRef}
         font="./soria-font.ttf"
-        fontSize={isMobile ? 0.16 : 0.28}
+        fontSize={0.28}
         color={GOLD}
         letterSpacing={0.12}
         anchorX={textAnchor}
         anchorY="top"
         fillOpacity={0}
-        position={[textX, -layout.height / 2 - (isMobile ? 0.08 : 0.12), 0.01]}>
+        position={[textX, -layout.height / 2 - 0.12, 0.01]}>
         {shot.title.toUpperCase()}
       </Text>
       <Text ref={captionRef}
         font="./Vercetti-Regular.woff"
-        fontSize={isMobile ? 0.075 : 0.11}
+        fontSize={0.11}
         color={IVORY}
-        maxWidth={isMobile ? layout.width : Math.max(layout.width, 1.8)}
+        maxWidth={Math.max(layout.width, 1.8)}
         textAlign={textAnchor}
         anchorX={textAnchor}
         anchorY="top"
         fillOpacity={0}
-        position={[textX, -layout.height / 2 - (isMobile ? 0.3 : 0.48), 0.01]}>
+        position={[textX, -layout.height / 2 - 0.48, 0.01]}>
         {shot.caption}
       </Text>
     </group>

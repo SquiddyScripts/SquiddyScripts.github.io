@@ -37,17 +37,15 @@ const PoemFall = () => {
   const materials = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
   const chars = useMemo(() => Array.from(LINE), []);
   const textures = useMemo(() => chars.map(glyphTexture), [chars]);
-  const size = isMobile ? 0.4 : 0.62;
-  const radius = isMobile ? 0.3 : 0.95;
+  const size = isMobile ? 0.3 : 0.62;
+  const radius = isMobile ? 0.36 : 0.95;
 
   // A slow spiral around the fall line gives each character its own spot on screen.
+  // On a phone the turn is tighter and wider-stepped so neighbours don't overlap on screen.
+  const step = isMobile ? 1.05 : 0.55;
+
   const placement = (i: number) => {
-    // A phone only has room for a narrow column, so characters alternate either side of it.
-    if (isMobile) {
-      const side = i % 2 === 0 ? -1 : 1;
-      return [side * radius, TOP + (BOTTOM - TOP) * (i / (chars.length - 1)), 5 + side * 0.15] as [number, number, number];
-    }
-    const angle = Math.PI * 0.9 + i * 0.55;
+    const angle = Math.PI * 0.9 + i * step;
     return [
       Math.cos(angle) * radius,
       TOP + (BOTTOM - TOP) * (i / (chars.length - 1)),
@@ -65,7 +63,7 @@ const PoemFall = () => {
       const above = camera.position.y - y;
       // On a phone each character peaks further off so its whole width stays on screen.
       material.opacity = isMobile
-        ? THREE.MathUtils.smoothstep(above, 1.6, 2.2) * (1 - THREE.MathUtils.smoothstep(above, 3, 3.8))
+        ? THREE.MathUtils.smoothstep(above, 1.3, 1.9) * (1 - THREE.MathUtils.smoothstep(above, 3.4, 4.6))
         : THREE.MathUtils.smoothstep(above, 0.35, 1.1) * (1 - THREE.MathUtils.smoothstep(above, 2.6, 4));
     });
   });
