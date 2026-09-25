@@ -31,9 +31,9 @@ const Experience = () => {
 
     if (titleRef.current) {
       titleRef.current.children.forEach((text, i) => {
-        // Each letter drops from its own step of a staircase; the last one still has a step to fall.
-        const steps = titleRef.current!.children.length + 1;
-        const y = Math.max(Math.min((1 - d) * (steps - i), 10), 0.5);
+        // Each letter drops from its own evenly spaced step of a staircase, highest first.
+        const count = titleRef.current!.children.length;
+        const y = 0.5 + (1 - d) * 9.5 * ((count - i) / count);
         text.position.y = THREE.MathUtils.damp(text.position.y, y, 7, delta);
         /* eslint-disable  @typescript-eslint/no-explicit-any */
         (text as any).fillOpacity = e;

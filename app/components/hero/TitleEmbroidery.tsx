@@ -31,6 +31,7 @@ const RIGHT_BRANCH: Stem[] = [
 // The phone layout is drawn for a 9:19.5 screen; narrower or wider ones scale it about the
 // title plane so the branches always frame the title without leaving the screen.
 const PHONE_ASPECT = 0.46;
+const SHOW_CLOUDS = false;
 
 const Title = ({ grow }: { grow: Grow }) => {
   const leftBranch = useMemo(() => LEFT_BRANCH, []);
@@ -68,10 +69,11 @@ const Title = ({ grow }: { grow: Grow }) => {
         <group position={isMobile ? [-9, 6.8, -2] : [2.6, 1.4, -3.5]}>
           <BlossomBranch stems={rightBranch} grow={grow} seed={23} blossomSize={isMobile ? 0.85 : 0.82} />
         </group>
-        <group position={isMobile ? [3.4, -4.2, -9.4] : [5.4, -4.4, -9.4]} scale={1.25}>
+        {/* Gold clouds are hidden until they're redesigned; flip SHOW_CLOUDS to bring them back. */}
+        <group visible={SHOW_CLOUDS} position={isMobile ? [3.4, -4.2, -9.4] : [5.4, -4.4, -9.4]} scale={1.25}>
           <GoldCloud grow={grow} start={0.15} end={0.85} />
         </group>
-        <group position={isMobile ? [-1.6, 5.6, -10.6] : [-4.2, 5.6, -10.6]} scale={[-1, 1, 1]}>
+        <group visible={SHOW_CLOUDS} position={isMobile ? [-1.6, 5.6, -10.6] : [-4.2, 5.6, -10.6]} scale={[-1, 1, 1]}>
           <GoldCloud grow={grow} start={0.3} end={1} />
         </group>
       </group>

@@ -1,6 +1,7 @@
 'use client';
 
-import { Text, useTexture } from "@react-three/drei";
+import { Line, Text, useTexture } from "@react-three/drei";
+import type { Line2, LineMaterial } from "three-stdlib";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import { isMobile } from "react-device-detect";
@@ -28,6 +29,7 @@ const Shot = ({ shot, index, count }: { shot: ProgressShot, index: number, count
   const frameRef = useRef<THREE.MeshBasicMaterial>(null);
   const titleRef = useRef<THREE.Mesh>(null);
   const captionRef = useRef<THREE.Mesh>(null);
+  const outlineRef = useRef<Line2>(null);
   const map = useTexture(shot.src);
 
   const layout = useMemo(() => {
@@ -46,6 +48,13 @@ const Shot = ({ shot, index, count }: { shot: ProgressShot, index: number, count
     };
   }, [index, count, shot.aspect]);
 
+  const outlinePoints = useMemo(() => {
+    const w = layout.width / 2 + 0.08;
+    const h = layout.height / 2 + 0.08;
+    return [[0, h], [w, h], [w, -h], [-w, -h], [-w, h], [0, h]].map(([x, y]) => new THREE.Vector3(x, y, 0.005));
+  }, [layout]);
+  const outlineLength = (layout.width + layout.height + 0.32) * 2;
+
   useFrame(({ camera, clock }) => {
     if (!groupRef.current) return;
     const above = camera.position.y - layout.y;
@@ -58,9 +67,19 @@ const Shot = ({ shot, index, count }: { shot: ProgressShot, index: number, count
     groupRef.current.position.x = layout.x + Math.sin(clock.elapsedTime * 0.4 + index) * 0.05 * PHONE_SCALE;
     groupRef.current.position.y = layout.y + Math.sin(clock.elapsedTime * 0.3 + index * 2) * 0.08;
 
+    // Well before the photo, its outline stitches itself around the frame from the top, so the
+    // way down always shows what's coming next.
+    const hint = 1 - THREE.MathUtils.smoothstep(above, 6, 15);
+    const draw = 1 - THREE.MathUtils.smoothstep(above, 4, 11);
+    const outline = outlineRef.current?.material as LineMaterial | undefined;
+    if (outline) {
+      outline.opacity = hint * 0.85 * (1 - reveal * 0.5);
+      outline.dashOffset = outlineLength * (1 - draw);
+    }
+
     if (photoRef.current) photoRef.current.opacity = reveal;
     if (frameRef.current) frameRef.current.opacity = reveal * reveal * reveal;
-    groupRef.current.visible = reveal > 0.001;
+    groupRef.current.visible = above > 0 && hint > 0.001;
     /* eslint-disable  @typescript-eslint/no-explicit-any */
     if (titleRef.current) (titleRef.current as any).fillOpacity = read;
     if (captionRef.current) (captionRef.current as any).fillOpacity = read * 0.8;
@@ -75,6 +94,16 @@ const Shot = ({ shot, index, count }: { shot: ProgressShot, index: number, count
       position={[layout.x, layout.y, layout.z]}
       rotation={[-Math.PI / 2 + layout.lean, 0, layout.tilt]}
       scale={PHONE_SCALE}>
+      <Line ref={outlineRef}
+        points={outlinePoints}
+        color={GOLD}
+        lineWidth={1.5}
+        dashed
+        dashSize={outlineLength}
+        gapSize={outlineLength}
+        transparent
+        opacity={0}
+        depthWrite={false} />
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[layout.width + 0.06, layout.height + 0.06]} />
         <meshBasicMaterial ref={frameRef} color={GOLD} transparent opacity={0} depthWrite={false} />
