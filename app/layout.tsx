@@ -15,9 +15,9 @@ const vercettiFont = localFont({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://SquiddyScripts.github.io/'),
-  title: "Amaan Khan",
-  description: "Developer, fashion designer, and creative based in Northern Virginia.",
-  keywords: "Amaan Khan, SquiddyScripts, Developer, Fashion Designer, Virginia Tech, React, Three.js, Engineering, Portfolio",
+  title: "Confessions — by Amaan S. Khan",
+  description: "A light fall jacket in maroon and black. Reserve a size or join the waitlist. 100 jackets in production.",
+  keywords: "Confessions, Amaan S. Khan, jacket, maroon, black, embroidery, suede",
   authors: [{ name: "Amaan Khan" }],
   creator: "Amaan Khan",
   publisher: "Amaan Khan",
@@ -37,21 +37,21 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Amaan Khan",
-    description: "Developer, fashion designer, and creative based in Northern Virginia.",
-    siteName: "Amaan Khan's Portfolio",
+    title: "Confessions — by Amaan S. Khan",
+    description: "A light fall jacket in maroon and black. Reserve a size or join the waitlist.",
+    siteName: "Confessions",
     locale: "en_US",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Amaan Khan",
-    description: "Developer, fashion designer, and creative based in Northern Virginia.",
+    title: "Confessions — by Amaan S. Khan",
+    description: "A light fall jacket in maroon and black. Reserve a size or join the waitlist.",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#000000",
+  themeColor: "#0B0908",
   initialScale: 1,
   minimumScale: 1,
   maximumScale: 1,

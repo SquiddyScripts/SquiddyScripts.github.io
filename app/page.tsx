@@ -17,4 +17,5 @@ const Home = () => {
     </CanvasLoader>
   );
 };
+
 export default Home;

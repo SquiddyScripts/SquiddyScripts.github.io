@@ -7,17 +7,18 @@ interface Theme {
 }
 
 const AvailableThemes: Theme[] = [{
-  type: 'light',
-  color: '#0690d4'
+  type: 'black',
+  color: '#0B0908'
 }, {
-  type: 'dark',
-  color: '#111'
+  type: 'maroon',
+  color: '#5C1A28'
 }];
 
 interface ThemeStore {
   themes: Theme[];
   theme: Theme;
   nextTheme: () => void;
+  setTheme: (type: string) => void;
 }
 
 export const useThemeStore = create<ThemeStore>()(
@@ -31,9 +32,14 @@ export const useThemeStore = create<ThemeStore>()(
         const nextThemeIndex = (activeThemeIndex + 1) % themes.length;
         set(() => ({ theme: themes[nextThemeIndex] }));
       },
+      setTheme: (type) => {
+        const theme = get().themes.find((t) => t.type === type);
+        if (theme) set(() => ({ theme }));
+      },
     }),
     {
       name: "theme-storage",
+      version: 2,
       partialize: (state) => ({ theme: state.theme }),
     }
   )

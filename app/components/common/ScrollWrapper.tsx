@@ -3,6 +3,7 @@
 import { useScroll } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { isMobile } from "react-device-detect";
+import { useEffect } from "react";
 import * as THREE from "three";
 
 import { usePortalStore, useScrollStore } from "@stores";
@@ -12,6 +13,17 @@ const ScrollWrapper = (props: { children: React.ReactNode | React.ReactNode[]}) 
   const data = useScroll();
   const isActive = usePortalStore((state) => !!state.activePortalId);
   const setScrollProgress = useScrollStore((state) => state.setScrollProgress);
+
+  // Dev only: ?scroll=0.5 jumps to that point of the fall.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return;
+    const scroll = new URLSearchParams(window.location.search).get('scroll');
+    if (!scroll) return;
+    const timer = setTimeout(() => {
+      data.el.scrollTop = Number(scroll) * (data.el.scrollHeight - data.el.clientHeight);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   useFrame((state, delta) => {
     if (data) {

@@ -1,3 +1,3 @@
 export * from './footer';
-export * from './projects';
+export * from './progress';
 export * from './work';

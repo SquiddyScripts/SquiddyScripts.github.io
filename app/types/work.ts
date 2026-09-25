@@ -6,4 +6,6 @@ export interface WorkTimelinePoint {
   title: string,
   subtitle?: string,
   position: 'left' | 'right',
+  image?: string,
+  aspect?: number,
 }

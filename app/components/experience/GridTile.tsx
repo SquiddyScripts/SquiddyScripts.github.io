@@ -62,9 +62,18 @@ const GridTile = (props: GridTileProps) => {
     }
   };
 
-  const portalInto = (e: React.MouseEvent) => {
+  const requestedPortalId = usePortalStore((state) => state.requestedPortalId);
+  const requestPortal = usePortalStore((state) => state.requestPortal);
+
+  useEffect(() => {
+    if (requestedPortalId !== id) return;
+    requestPortal(null);
+    portalInto();
+  }, [requestedPortalId]);
+
+  const portalInto = (e?: { stopPropagation: () => void }) => {
     if (isActive || activePortalId) return;
-    e.stopPropagation();
+    e?.stopPropagation();
     setActivePortal(id);
     document.body.style.cursor = 'auto';
     const div = document.createElement('div');
@@ -140,6 +149,7 @@ const GridTile = (props: GridTileProps) => {
 
   const onPointerOver = () => {
     if (isActive || isMobile) return;
+    usePortalStore.getState().setHoveredPortal(id);
     document.body.style.cursor = 'pointer';
     gsap.to(titleRef.current, {
       fillOpacity: 1
@@ -152,6 +162,7 @@ const GridTile = (props: GridTileProps) => {
 
   const onPointerOut = () => {
     if (isMobile) return;
+    usePortalStore.getState().setHoveredPortal(null);
     document.body.style.cursor = 'auto';
     gsap.to(titleRef.current, {
       fillOpacity: 0

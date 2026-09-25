@@ -1,4 +1,4 @@
-import { Box, Edges, Line, Text, TextProps } from "@react-three/drei";
+import { Box, Edges, Line, Text, TextProps, useTexture } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { usePortalStore } from "@stores";
 import gsap from "gsap";
@@ -49,15 +49,38 @@ const TimelinePoint = ({ point, diff }: { point: WorkTimelinePoint, diff: number
             {point.year}
           </Text>
           <group position={[0, -0.5, 0]}>
-            <Text {...titleProps} fontSize={0.6} maxWidth={3} position={[0, -diff / 2, 0]}>
+            <Text {...titleProps} fontSize={0.6} maxWidth={7} position={[0, -diff / 2, 0]}>
               {point.title}
             </Text>
-            <Text {...textProps} fontSize={0.2} position={[0, -0.4 - diff, 0]}>
+            <Text {...textProps} fontSize={0.2} maxWidth={3.4} anchorY="top" position={[0, -0.4 - diff, 0]}>
               {point.subtitle}
             </Text>
           </group>
         </group>
+        {point.image && <TimelinePhoto point={point} diff={diff} />}
       </group>
+    </group>
+  );
+};
+
+// Opens out from the point on the opposite side of its text once the line reaches it.
+const TimelinePhoto = ({ point, diff }: { point: WorkTimelinePoint, diff: number }) => {
+  const map = useTexture(point.image!);
+  const aspect = point.aspect ?? 1;
+  const height = aspect > 1.5 ? 1.6 : 2.6;
+  const width = height * aspect;
+  const side = point.position === 'left' ? 1 : -1;
+  const open = 1 - diff;
+
+  return (
+    <group position={[side * (0.5 + width / 2), 0.4 - height / 2, -0.2]}
+      scale={[open, open, 1]}
+      rotation={[0, side * -0.15, 0]}>
+      <mesh>
+        <planeGeometry args={[width, height]} />
+        <meshBasicMaterial map={map} toneMapped={false} transparent opacity={open} />
+        <Edges color="#C6A36A" lineWidth={1} />
+      </mesh>
     </group>
   );
 };

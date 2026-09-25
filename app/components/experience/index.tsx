@@ -15,9 +15,9 @@ const Experience = () => {
   const isActive = usePortalStore((state) => !!state.activePortalId);
 
   const fontProps = {
-    font: "./soria-font.ttf",
-    fontSize: 0.4,
-    color: 'white',
+    font: "./cormorant-sc.ttf",
+    fontSize: 0.46,
+    color: '#D2B27C',
   };
 
   useFrame((sate, delta) => {
@@ -40,9 +40,9 @@ const Experience = () => {
   });
 
   const getTitle = () => {
-    const title = 'experience'.toUpperCase();
+    const title = 'confessions'.toUpperCase();
     return title.split('').map((char, i) => {
-      const diff = isMobile ? 0.4 : 0.8;
+      const diff = isMobile ? 0.32 : 0.8;
       return (
         <Text key={i} {...fontProps} position={[i * diff, 2, 1]}>{char}</Text>
       );
@@ -56,21 +56,21 @@ const Experience = () => {
         <shadowMaterial opacity={0.1} />
       </mesh> */}
       <group rotation={[0, 0, Math.PI / 2]}>
-        <group ref={titleRef} position={[isMobile ? -1.8 : -3.6, 2, -2]}>
+        <group ref={titleRef} position={[isMobile ? -1.6 : -4, 2, -2]}>
           {getTitle()}
         </group>
 
         <group position={[0, -1, 0]} ref={groupRef}>
-          <GridTile title='WORK AND EDUCATION'
+          <GridTile title=''
             id="work"
-            color='#b9c6d6'
+            color='#6E2A38'
             textAlign='left'
             position={new THREE.Vector3(isMobile ? -1 : -2, 0, isMobile ? 0.4 : 0)}>
             <Work/>
           </GridTile>
-          <GridTile title='SIDE PROJECTS'
+          <GridTile title=''
             id="projects"
-            color='#bdd1e3'
+            color='#E7D5C4'
             textAlign='right'
             position={new THREE.Vector3(isMobile ? 1 : 2, 0, 0)}>
             <Projects/>
