@@ -1,4 +1,5 @@
 import { Edges, Line, Text, TextProps, useTexture } from "@react-three/drei";
+import { BUY_ENABLED, PAYMENT_LINK } from "@constants";
 import { ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import gsap from "gsap";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -8,7 +9,7 @@ import * as THREE from "three";
 import { JacketColor, JacketSize, OrderField, useOrderStore, usePortalStore, useThemeStore } from "@stores";
 import { Petals } from "../../embroidery/Petals";
 import { finale, resetFinale } from "./finale";
-import { isEmail, sendReservation } from "../../../utils/reserve";
+import { checkoutUrl, isEmail, sendReservation } from "../../../utils/reserve";
 
 const INK = '#140E0C';
 const PAPER = '#EFE6DA';
@@ -29,8 +30,36 @@ const TILE_PREVIEW = new THREE.Color('#E7D5C4');
 
 // Seconds from a reservation landing to the warp bursting into petals.
 const BURST_AT = 2;
-// Where the card sits, in shop space, to land dead center of the camera during the finale.
-const CARD_CENTER = isMobile ? 0 : -1.6;
+// Laptop: card and tag side by side. Phone: card stacked over the tag, the whole stack centered
+// and scaled to the screen. warpY/restY are where the card sits during and after the finale.
+const LAYOUT = isMobile ? {
+  position: [0, 1.55, -1] as [number, number, number],
+  card: [0, 3.46] as [number, number],
+  controls: [0, -1.28] as [number, number],
+  cardScale: 0.62,
+  warpY: 0,
+  restY: -0.7,
+  reservedY: 2.15,
+  reservedScale: 0.6,
+} : {
+  position: [1.4, 1.3, -1.6] as [number, number, number],
+  card: [-1.6, 0] as [number, number],
+  controls: [1.6, 0] as [number, number],
+  cardScale: 1,
+  warpY: 1.3,
+  restY: -0.45,
+  reservedY: 2.95,
+  reservedScale: 1,
+};
+const CARD_CENTER = LAYOUT.card[0];
+
+// What the phone camera sees at the shop's depth, in world units, and the stack it has to fit.
+const PHONE_VIEW_HEIGHT = 5.3;
+const PHONE_STACK: [number, number] = [3.4, 10.1];
+const phoneScale = (aspect: number) => Math.min(
+  (PHONE_VIEW_HEIGHT * 0.97) / PHONE_STACK[1],
+  (PHONE_VIEW_HEIGHT * aspect) / PHONE_STACK[0],
+);
 
 // The panel is the jacket's hang tag: chamfered head, punched eyelet, stitched edge.
 const TAG = { width: 3.1, bottom: -3.3, top: 3.5, chamfer: 0.55, eyelet: 3.14 };
@@ -284,9 +313,17 @@ const submit = async () => {
   if (!isEmail(email)) return setStatus('error', 'Check the email address.');
 
   setStatus('sending');
+  const order = { name: name.trim(), email: email.trim(), color, size };
+  if (BUY_ENABLED) {
+    // The heads-up email must not hold up the trip to checkout.
+    sendReservation({ ...order, intent: 'checkout' }).catch(() => {});
+    setStatus('sent', `${color} · ${size} · taking you to payment`, 'CHECKOUT');
+    setTimeout(() => window.location.assign(checkoutUrl(PAYMENT_LINK, order)), (BURST_AT + 1.6) * 1000);
+    return;
+  }
   try {
-    await sendReservation({ name: name.trim(), email: email.trim(), color, size });
-    setStatus('sent', `${color} · ${size} · held for ${name.trim().split(' ')[0]}`);
+    await sendReservation(order);
+    setStatus('sent', `${color} · ${size} · held for ${name.trim().split(' ')[0]}`, 'RESERVED');
   } catch {
     setStatus('error', 'Didn\'t send. Email amaaninva@gmail.com instead.');
   }
@@ -330,7 +367,7 @@ const ReserveButton = ({ position }: { position: [number, number, number] }) => 
     submit();
   };
 
-  const text = status === 'sending' ? 'STITCHING' : 'RESERVE';
+  const text = status === 'sending' ? 'STITCHING' : BUY_ENABLED ? 'BUY' : 'RESERVE';
 
   return (
     <group position={position}>
@@ -421,7 +458,9 @@ const Controls = () => {
         anchorY="top"
         color={status === 'error' ? MAROON : INK}
         position={[-1.25, -2.95, 0]}>
-        {status === 'error' ? message : 'Nothing is charged now. I\'ll email you to confirm before your jacket is held.'}
+        {status === 'error' ? message : BUY_ENABLED
+          ? 'Secure checkout by Stripe. Ships once production wraps; I\'ll email you tracking.'
+          : 'Nothing is charged now. I\'ll email you to confirm before your jacket is held.'}
       </Text>
     </group>
   );
@@ -434,19 +473,21 @@ const Reserved = () => {
   const lineRef = useRef<THREE.Mesh>(null);
   const status = useOrderStore((state) => state.status);
   const message = useOrderStore((state) => state.message);
+  const headline = useOrderStore((state) => state.headline);
 
   useEffect(() => {
     if (status !== 'sent' || !ref.current) return;
     const tl = gsap.timeline({ delay: BURST_AT + 0.15 });
-    tl.fromTo(ref.current.scale, { x: 0.001, y: 0.001, z: 0.001 }, { x: 1, y: 1, z: 1, duration: 0.01 })
+    const s = LAYOUT.reservedScale;
+    tl.fromTo(ref.current.scale, { x: 0.001, y: 0.001, z: 0.001 }, { x: s, y: s, z: s, duration: 0.01 })
       .fromTo(titleRef.current, { letterSpacing: 1.2, fillOpacity: 0 }, { letterSpacing: 0.28, fillOpacity: 1, duration: 1.8, ease: 'expo.out' })
       .fromTo(lineRef.current!.scale, { x: 0 }, { x: 1, duration: 1.2, ease: 'power3.inOut' }, '-=1.2');
   }, [status]);
 
   return (
-    <group ref={ref} scale={0.001} position={[CARD_CENTER, 2.95, 0.4]}>
+    <group ref={ref} scale={0.001} position={[CARD_CENTER, LAYOUT.reservedY, 0.4]}>
       <Text ref={titleRef} font="./cormorant-sc.ttf" fontSize={0.62} color={PAPER} anchorX="center" letterSpacing={0.28}>
-        RESERVED
+        {headline}
       </Text>
       <mesh ref={lineRef} position={[0, -0.45, 0]}>
         <planeGeometry args={[3.6, 0.02]} />
@@ -456,7 +497,7 @@ const Reserved = () => {
         {message}
       </Text>
       <Text font="./Vercetti-Regular.woff" fontSize={0.12} color={PAPER} fillOpacity={0.7} anchorX="center" position={[0, -1.12, 0]} letterSpacing={0.3}>
-        CHECK YOUR EMAIL
+        {headline === 'CHECKOUT' ? 'SECURE PAYMENT BY STRIPE' : 'CHECK YOUR EMAIL'}
       </Text>
     </group>
   );
@@ -479,13 +520,14 @@ const JacketBrowser = () => {
   const scene = useThree((state) => state.scene);
   const [fired, setFired] = useState(0);
   const [panelGone, setPanelGone] = useState(false);
-  const scale = isMobile ? 0.58 : 0.86;
+  const aspect = useThree((state) => state.size.width / state.size.height);
+  const scale = isMobile ? phoneScale(aspect) : 0.86;
 
   useEffect(() => {
     if (!groupRef.current) return;
     const s = scale * (isActive ? 1 : 0.9);
     gsap.to(groupRef.current.scale, { x: s, y: s, z: s, duration: 1 });
-  }, [isActive]);
+  }, [isActive, scale]);
 
   useEffect(() => {
     if (isActive) setTheme(color === 'Maroon' ? 'maroon' : 'black');
@@ -502,8 +544,9 @@ const JacketBrowser = () => {
       gsap.to(slot.rotation, { y: -1.4, z: -0.5, duration: 0.7, ease: 'power3.in' });
     }
     if (cardSlot.current) {
-      gsap.to(cardSlot.current.position, { x: CARD_CENTER, y: 1.3, duration: 0.9, ease: 'power3.inOut' });
-      gsap.to(cardSlot.current.position, { y: -0.45, duration: 1.4, delay: BURST_AT + 0.1, ease: 'power3.inOut' });
+      gsap.to(cardSlot.current.position, { x: CARD_CENTER, y: LAYOUT.warpY, duration: 0.9, ease: 'power3.inOut' });
+      gsap.to(cardSlot.current.position, { y: LAYOUT.restY, duration: 1.4, delay: BURST_AT + 0.1, ease: 'power3.inOut' });
+      gsap.to(cardSlot.current.scale, { x: 1, y: 1, z: 1, duration: 0.9, ease: 'power3.inOut' });
     }
     const tl = gsap.timeline();
     tl.to(finale, { warp: 1, shake: 0.7, zoom: 1, duration: BURST_AT - 0.3, ease: 'power2.in' }, 0.3)
@@ -524,13 +567,6 @@ const JacketBrowser = () => {
     if (swayRef.current) swayRef.current.rotation.z = Math.sin(clock.elapsedTime * 0.7) * 0.012;
   });
 
-  const thread = useMemo(() => {
-    const from = new THREE.Vector3(1.6, TAG.eyelet, -0.07);
-    const to = new THREE.Vector3(-1.6 + 1.28, 1.62, 0);
-    const sag = from.clone().lerp(to, 0.5).add(new THREE.Vector3(0, -0.35, 0.05));
-    return new THREE.QuadraticBezierCurve3(from, sag, to).getPoints(24);
-  }, []);
-
   // Eases the portal's backdrop to the chosen colorway, and back to the tile color on exit.
   useFrame((_, delta) => {
     if (scene.background instanceof THREE.Color) {
@@ -541,18 +577,17 @@ const JacketBrowser = () => {
 
   return (
     <group ref={groupRef}
-      position={isMobile ? [0.9, 1.4, -1] : [1.4, 1.3, -1.6]}
+      position={LAYOUT.position}
       scale={scale}>
       <group visible={isActive}>
         <Petals mode="drift" count={70} bounds={[16, 10, 8]} size={0.14} />
       </group>
-      <group ref={cardSlot} position={[-1.6, 0, 0]} visible={isActive}>
+      <group ref={cardSlot} position={[LAYOUT.card[0], LAYOUT.card[1], 0]} scale={LAYOUT.cardScale} visible={isActive}>
         <JacketCard />
       </group>
-      <Line points={thread} color={GOLD} lineWidth={1.2} visible={isActive && status !== 'sent'} />
-      <group ref={controlsSlot} position={[1.6, 0, 0]} visible={isActive && !panelGone}>
+      <group ref={controlsSlot} position={[LAYOUT.controls[0], LAYOUT.controls[1], 0]} visible={isActive && !panelGone}>
         {/* Hangs from its eyelet, turned slightly toward the jacket it belongs to. */}
-        <group position={[0, TAG.eyelet, 0]} rotation={[0, -0.08, 0]}>
+        <group position={[0, TAG.eyelet, 0]} rotation={[0, isMobile ? 0 : -0.08, 0]}>
           <group ref={swayRef}>
             <group position={[0, -TAG.eyelet, 0]}>
               <Controls />
@@ -561,7 +596,7 @@ const JacketBrowser = () => {
         </group>
       </group>
       <Reserved />
-      <Petals mode="burst" count={140} origin={[CARD_CENTER, 1.3, 0.6]} fire={fired} size={0.18} />
+      <Petals mode="burst" count={140} origin={[CARD_CENTER, LAYOUT.warpY, 0.6]} fire={fired} size={0.18} />
     </group>
   );
 };

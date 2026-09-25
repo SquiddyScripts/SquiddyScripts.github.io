@@ -10,8 +10,8 @@ import { useOrderStore, usePortalStore } from "@stores";
 
 // People wearing it, rising slowly in two columns far out on either flank so the middle stays
 // clear for the jacket and the reservation tag. Looking around brings them into view.
-const MIDDLE = 1.6;
-const SPREAD = isMobile ? 6.6 : 9.4;
+const MIDDLE = isMobile ? 0 : 1.6;
+const SPREAD = isMobile ? 5.2 : 9.4;
 // The tag hangs right of the jacket, so the right column stands off further to clear it.
 const RIGHT_EXTRA = isMobile ? 0 : 2.4;
 const DEPTH = -9;

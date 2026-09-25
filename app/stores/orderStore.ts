@@ -13,11 +13,13 @@ interface OrderStore {
   focused: OrderField | null;
   status: OrderStatus;
   message: string;
+  // The finale's big word: RESERVED, CHECKOUT on the way to payment, YOURS once paid.
+  headline: string;
   setColor: (color: JacketColor) => void;
   setSize: (size: JacketSize) => void;
   setField: (field: OrderField, value: string) => void;
   setFocused: (field: OrderField | null) => void;
-  setStatus: (status: OrderStatus, message?: string) => void;
+  setStatus: (status: OrderStatus, message?: string, headline?: string) => void;
 }
 
 export const useOrderStore = create<OrderStore>((set) => ({
@@ -28,9 +30,10 @@ export const useOrderStore = create<OrderStore>((set) => ({
   focused: null,
   status: 'idle',
   message: '',
+  headline: 'RESERVED',
   setColor: (color) => set(() => ({ color })),
   setSize: (size) => set(() => ({ size })),
   setField: (field, value) => set(() => ({ [field]: value }) as Pick<OrderStore, OrderField>),
   setFocused: (focused) => set(() => ({ focused })),
-  setStatus: (status, message = '') => set(() => ({ status, message })),
+  setStatus: (status, message = '', headline) => set((state) => ({ status, message, headline: headline ?? state.headline })),
 }));

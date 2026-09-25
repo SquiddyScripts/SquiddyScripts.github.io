@@ -1,6 +1,7 @@
 'use client';
 
 import { Text } from "@react-three/drei";
+import { useThree } from "@react-three/fiber";
 import { useProgress } from "@react-three/drei";
 import gsap from "gsap";
 import { useEffect, useMemo, useRef } from "react";
@@ -27,12 +28,19 @@ const RIGHT_BRANCH: Stem[] = [
   { points: [[10.6, 4.6, -10], [12.6, 3.2, -10.1], [13.6, 1, -10.2]], radius: 0.06, start: 0.5, end: 0.9, blossoms: 5, leaves: 2 },
 ];
 
+// The phone layout is drawn for a 9:19.5 screen; narrower or wider ones scale it about the
+// title plane so the branches always frame the title without leaving the screen.
+const PHONE_ASPECT = 0.46;
+
 const Title = ({ grow }: { grow: Grow }) => {
   const leftBranch = useMemo(() => LEFT_BRANCH, []);
   const rightBranch = useMemo(() => RIGHT_BRANCH, []);
+  const aspect = useThree((state) => state.size.width / state.size.height);
+  const fit = isMobile ? Math.min(1.15, aspect / PHONE_ASPECT) : 1;
 
   return (
-    <group>
+    <group position={[0, 0, -10]} scale={fit}>
+    <group position={[0, 0, 10]}>
       <Text position={[0, 0.8, -10]}
         font="./cormorant-sc.ttf"
         fontSize={isMobile ? 1.05 : 2.5}
@@ -54,19 +62,20 @@ const Title = ({ grow }: { grow: Grow }) => {
       {/* On a portrait phone the branches come up from below the title and down from above it. */}
       <group scale={isMobile ? 0.5 : 1}>
         {/* The left branch hangs closer to the camera and the right one sits further back, for depth. */}
-        <group position={isMobile ? [8.5, -12, 2] : [-0.6, -0.4, 2.6]}>
-          <BlossomBranch stems={leftBranch} grow={grow} seed={11} blossomSize={0.78} />
+        <group position={isMobile ? [8.6, -10, 2] : [-0.6, -0.4, 2.6]}>
+          <BlossomBranch stems={leftBranch} grow={grow} seed={11} blossomSize={isMobile ? 0.85 : 0.78} />
         </group>
-        <group position={isMobile ? [-9, 7.5, -2] : [2.6, 1.4, -3.5]}>
-          <BlossomBranch stems={rightBranch} grow={grow} seed={23} blossomSize={0.82} />
+        <group position={isMobile ? [-9, 6.8, -2] : [2.6, 1.4, -3.5]}>
+          <BlossomBranch stems={rightBranch} grow={grow} seed={23} blossomSize={isMobile ? 0.85 : 0.82} />
         </group>
-        <group position={isMobile ? [0.4, -4.2, -9.4] : [5.4, -4.4, -9.4]} scale={1.25}>
+        <group position={isMobile ? [3.4, -4.2, -9.4] : [5.4, -4.4, -9.4]} scale={1.25}>
           <GoldCloud grow={grow} start={0.15} end={0.85} />
         </group>
-        <group position={isMobile ? [3.2, 5.6, -10.6] : [-4.2, 5.6, -10.6]} scale={[-1, 1, 1]}>
+        <group position={isMobile ? [-1.6, 5.6, -10.6] : [-4.2, 5.6, -10.6]} scale={[-1, 1, 1]}>
           <GoldCloud grow={grow} start={0.3} end={1} />
         </group>
       </group>
+    </group>
     </group>
   );
 };
@@ -81,8 +90,7 @@ const TitleEmbroidery = () => {
     if (groupRef.current) {
       gsap.fromTo(groupRef.current.position, { y: -10 }, { y: 0, duration: 3 });
     }
-    // Waits until the scene has faded in, so the growth is watched rather than missed.
-    gsap.to(grow, { value: 1, duration: 5, delay: 3.6, ease: 'power1.inOut' });
+    gsap.to(grow, { value: 1, duration: 4, delay: 1.6, ease: 'power1.inOut' });
   }, [progress]);
 
   return (

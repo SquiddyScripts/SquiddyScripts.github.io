@@ -1,3 +1,4 @@
+export * from './checkout';
 export * from './footer';
 export * from './progress';
 export * from './wearers';

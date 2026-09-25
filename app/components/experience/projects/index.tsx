@@ -4,6 +4,7 @@ import gsap from "gsap";
 import { useEffect } from "react";
 import { isMobile } from "react-device-detect";
 import * as THREE from "three";
+import { BUY_ENABLED } from "@constants";
 import { useOrderStore, usePortalStore } from "@stores";
 import TileMotif from "../../embroidery/TileMotif";
 import { finale } from "./finale";
@@ -21,6 +22,19 @@ const Projects = () => {
   const isActive = usePortalStore((state) => state.activePortalId === "projects");
   const reserved = useOrderStore((state) => state.status === 'sent');
   const data = useScroll();
+
+  // Back from Stripe with ?paid=1: land in the shop and play the finale for the purchase.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('paid') !== '1') return;
+    window.history.replaceState(null, '', window.location.pathname);
+    const timers = [
+      setTimeout(() => { data.el.scrollTop = data.el.scrollHeight; }, 1500),
+      setTimeout(() => usePortalStore.getState().requestPortal('projects'), 4000),
+      setTimeout(() => useOrderStore.getState().setStatus('sent', 'Paid · your receipt is in your email', 'YOURS'), 6000),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   useEffect(() => {
     // Hide scrollbar when active.
@@ -52,11 +66,11 @@ const Projects = () => {
 
   return (
     <group>
-      <TileMotif id="projects" kind="blossom" label="RESERVE" color="#140E0C" visible={!isActive} />
+      <TileMotif id="projects" kind="blossom" label={BUY_ENABLED ? 'BUY' : 'RESERVE'} color="#140E0C" visible={!isActive} />
       <JacketBrowser />
       <Wearers />
       <Warp />
-      { isActive && isMobile && <TouchPanControls /> }
+      { isActive && isMobile && !reserved && <TouchPanControls /> }
     </group>
   );
 };

@@ -11,9 +11,12 @@ import { WorkTimelinePoint } from "@types";
 
 const reusableLeft = new THREE.Vector3(-0.3, 0, -0.1);
 const reusableRight = new THREE.Vector3(0.3, 0, -0.1);
+// A phone is too narrow for text beside the point, so it stacks: photo above, words below.
+const reusableBelow = new THREE.Vector3(0, -0.35, -0.1);
 
 const TimelinePoint = ({ point, diff }: { point: WorkTimelinePoint, diff: number }) => {
   const getPoint = useMemo(() => {
+    if (isMobile) return reusableBelow;
     switch (point.position) {
       case 'left': return reusableLeft;
       case 'right': return reusableRight;
@@ -21,12 +24,13 @@ const TimelinePoint = ({ point, diff }: { point: WorkTimelinePoint, diff: number
     }
   }, [point.position]);
 
-  const textAlign = point.position === 'left' ? 'right' : 'left';
+  const textAlign = isMobile ? 'center' : point.position === 'left' ? 'right' : 'left';
 
   const textProps: Partial<TextProps> = useMemo(() => ({
     font: "./Vercetti-Regular.woff",
     color: "white",
     anchorX: textAlign,
+    textAlign: isMobile ? 'center' : undefined,
     fillOpacity: 2 - 2 * diff,
   }), [textAlign, diff]);
 
@@ -49,10 +53,10 @@ const TimelinePoint = ({ point, diff }: { point: WorkTimelinePoint, diff: number
             {point.year}
           </Text>
           <group position={[0, -0.5, 0]}>
-            <Text {...titleProps} fontSize={0.6} maxWidth={7} position={[0, -diff / 2, 0]}>
+            <Text {...titleProps} fontSize={isMobile ? 0.34 : 0.6} maxWidth={isMobile ? 4.2 : 7} anchorY={isMobile ? 'top' : 'middle'} position={[0, isMobile ? 0.3 - diff / 2 : -diff / 2, 0]}>
               {point.title}
             </Text>
-            <Text {...textProps} fontSize={0.2} maxWidth={3.4} anchorY="top" position={[0, -0.4 - diff, 0]}>
+            <Text {...textProps} fontSize={isMobile ? 0.19 : 0.2} maxWidth={isMobile ? 3.6 : 3.4} anchorY="top" position={[0, (isMobile ? -0.2 : -0.4) - diff, 0]}>
               {point.subtitle}
             </Text>
           </group>
@@ -67,15 +71,18 @@ const TimelinePoint = ({ point, diff }: { point: WorkTimelinePoint, diff: number
 const TimelinePhoto = ({ point, diff }: { point: WorkTimelinePoint, diff: number }) => {
   const map = useTexture(point.image!);
   const aspect = point.aspect ?? 1;
-  const height = aspect > 1.5 ? 1.6 : 2.6;
+  const height = isMobile ? Math.min(2.4, 3.6 / aspect) : aspect > 1.5 ? 1.6 : 2.6;
   const width = height * aspect;
   const side = point.position === 'left' ? 1 : -1;
   const open = 1 - diff;
+  const position: [number, number, number] = isMobile
+    ? [0, 0.35 + height / 2, -0.2]
+    : [side * (0.5 + width / 2), 0.4 - height / 2, -0.2];
 
   return (
-    <group position={[side * (0.5 + width / 2), 0.4 - height / 2, -0.2]}
+    <group position={position}
       scale={[open, open, 1]}
-      rotation={[0, side * -0.15, 0]}>
+      rotation={[0, isMobile ? 0 : side * -0.15, 0]}>
       <mesh>
         <planeGeometry args={[width, height]} />
         <meshBasicMaterial map={map} toneMapped={false} transparent opacity={open} />

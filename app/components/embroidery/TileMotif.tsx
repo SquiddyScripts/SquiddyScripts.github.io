@@ -4,6 +4,7 @@ import { Text, useScroll } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import gsap from "gsap";
 import { useEffect, useMemo, useRef } from "react";
+import { isMobile } from "react-device-detect";
 import * as THREE from "three";
 
 import { usePortalStore } from "@stores";
@@ -46,21 +47,27 @@ const TileMotif = ({ id, kind, label, color, visible }: TileMotifProps) => {
     if (labelRef.current) gsap.to(labelRef.current, { letterSpacing: hovered ? 0.3 : 0.14, duration: 0.5, ease: 'power2.out' });
   }, [hovered]);
 
+  // On a phone each tile is a triangle (story lower left, shop upper right), so the motif and
+  // label sit inside that half.
+  const phone = isMobile ? (kind === 'cloud'
+    ? { motif: [0.15, -0.35, -1.4], scale: 0.42, label: [0.2, -1.3, -1.2] }
+    : { motif: [0.5, 0.1, 0], scale: 0.6, label: [-0.35, 1.5, -1.2] }) : null;
+
   return (
     <group ref={ref}>
       {kind === 'cloud' ? (
-        <group position={[0, 0.3, -1.4]} scale={0.62}>
+        <group position={(phone?.motif ?? [0, 0.3, -1.4]) as [number, number, number]} scale={phone?.scale ?? 0.62}>
           <GoldCloud grow={grow} thread={0.045} />
         </group>
       ) : (
-        <group position={[0.5, 0.55, 0]}>
+        <group position={(phone?.motif ?? [0.5, 0.55, 0]) as [number, number, number]} scale={phone?.scale ?? 1}>
           <BlossomBranch stems={sprig} grow={grow} seed={5} blossomSize={0.34} />
         </group>
       )}
       <Text ref={labelRef}
-        position={[0, -1.25, -1.2]}
+        position={(phone?.label ?? [0, -1.25, -1.2]) as [number, number, number]}
         font="./cormorant-sc.ttf"
-        fontSize={0.4}
+        fontSize={isMobile ? 0.34 : 0.4}
         letterSpacing={0.14}
         color={color}
         anchorX="center"

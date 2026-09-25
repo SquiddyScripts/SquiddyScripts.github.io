@@ -8,6 +8,16 @@ import * as THREE from "three";
 
 import { usePortalStore, useScrollStore } from "@stores";
 
+// The two floor tiles span about 4.4 units at y = -41.5. On a narrow screen the camera settles
+// high enough above them that both fit across.
+const TILE_FLOOR = -41.5;
+const TILE_SPAN = 4.6;
+const tileLift = ({ width, height }: { width: number, height: number }) => {
+  const halfWidth = Math.tan(THREE.MathUtils.degToRad(75 / 2)) * (width / height);
+  const distance = TILE_SPAN / 2 / halfWidth;
+  return Math.max(0, TILE_FLOOR + distance + 37);
+};
+
 const ScrollWrapper = (props: { children: React.ReactNode | React.ReactNode[]}) => {
   const { camera } = useThree();
   const data = useScroll();
@@ -33,7 +43,7 @@ const ScrollWrapper = (props: { children: React.ReactNode | React.ReactNode[]}) 
 
       if (!isActive) {
         camera.rotation.x = THREE.MathUtils.damp(camera.rotation.x, -0.5 * Math.PI * a, 5, delta);
-        camera.position.y = THREE.MathUtils.damp(camera.position.y, -37 * b, 7, delta);
+        camera.position.y = THREE.MathUtils.damp(camera.position.y, (-37 + (isMobile ? tileLift(state.size) : 0)) * b, 7, delta);
         camera.position.z = THREE.MathUtils.damp(camera.position.z, 5 + 10 * d, 7, delta);
 
         setScrollProgress(data.range(0, 1));
