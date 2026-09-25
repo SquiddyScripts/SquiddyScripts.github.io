@@ -124,7 +124,7 @@ const JacketCard = () => {
 
   // Spins up with the warp and lands face-on the instant it bursts.
   useEffect(() => {
-    if (status !== 'sent' || !cardRef.current) return;
+    if (status !== 'sent' || !useOrderStore.getState().celebrate || !cardRef.current) return;
     gsap.fromTo(cardRef.current.rotation, { y: base }, { y: base + Math.PI * 6, duration: BURST_AT, ease: 'power3.in' });
     gsap.timeline({ delay: BURST_AT })
       .to(cardRef.current.scale, { x: 1.14, y: 1.14, duration: 0.08 })
@@ -481,8 +481,15 @@ const Reserved = () => {
       ref.current.scale.setScalar(0.001);
       return;
     }
-    const tl = gsap.timeline({ delay: BURST_AT + 0.15 });
     const s = LAYOUT.reservedScale;
+    // A reservation saved from an earlier visit is simply shown, without replaying the finale.
+    if (!useOrderStore.getState().celebrate) {
+      ref.current.scale.setScalar(s);
+      if (titleRef.current) Object.assign(titleRef.current, { letterSpacing: 0.28, fillOpacity: 1 });
+      lineRef.current?.scale.set(1, 1, 1);
+      return;
+    }
+    const tl = gsap.timeline({ delay: BURST_AT + 0.15 });
     tl.fromTo(ref.current.scale, { x: 0.001, y: 0.001, z: 0.001 }, { x: s, y: s, z: s, duration: 0.01 })
       .fromTo(titleRef.current, { letterSpacing: 1.2, fillOpacity: 0 }, { letterSpacing: 0.28, fillOpacity: 1, duration: 1.8, ease: 'expo.out' })
       .fromTo(lineRef.current!.scale, { x: 0 }, { x: 1, duration: 1.2, ease: 'power3.inOut' }, '-=1.2');
@@ -504,6 +511,18 @@ const Reserved = () => {
       <Text font="./Vercetti-Regular.woff" fontSize={0.12} color={PAPER} fillOpacity={0.7} anchorX="center" position={[0, -1.12, 0]} letterSpacing={0.3}>
         {headline === 'CHECKOUT' ? 'SECURE PAYMENT BY STRIPE' : 'CHECK YOUR EMAIL'}
       </Text>
+      {headline === 'RESERVED' && (
+        <Text font="./cormorant-sc.ttf"
+          fontSize={0.17}
+          color={GOLD}
+          anchorX="center"
+          letterSpacing={0.24}
+          position={[0, -1.5, 0]}
+          onClick={(e) => { e.stopPropagation(); useOrderStore.getState().setStatus('idle', '', 'RESERVED'); }}
+          {...pointer}>
+          RESERVE ANOTHER
+        </Text>
+      )}
     </group>
   );
 };
@@ -525,6 +544,9 @@ const JacketBrowser = () => {
   const scene = useThree((state) => state.scene);
   const [fired, setFired] = useState(0);
   const [panelGone, setPanelGone] = useState(false);
+  const celebrate = useOrderStore((state) => state.celebrate);
+  // Gone once it has flown off in the finale, or straight away for a reservation already saved.
+  const tagHidden = status === 'sent' && (panelGone || !celebrate);
   const aspect = useThree((state) => state.size.width / state.size.height);
   const scale = isMobile ? phoneScale(aspect) : 0.86;
 
@@ -536,39 +558,41 @@ const JacketBrowser = () => {
     gsap.to(groupRef.current.position, { y: LAYOUT.position[1] - (isActive ? 0 : 2), duration: 1, delay: isActive ? 0.4 : 0, ease: 'power3.out' });
   }, [isActive, scale]);
 
-  // Leaving after the finale puts the shop back together, so coming back in starts fresh.
-  useEffect(() => {
-    if (isActive || status !== 'sent') return;
-    const timer = setTimeout(() => {
-      useOrderStore.getState().setStatus('idle', '', 'RESERVED');
-      setPanelGone(false);
-      resetFinale();
-      if (controlsSlot.current) {
-        gsap.killTweensOf([controlsSlot.current.position, controlsSlot.current.rotation]);
-        controlsSlot.current.position.set(LAYOUT.controls[0], LAYOUT.controls[1], 0);
-        controlsSlot.current.rotation.set(0, 0, 0);
-      }
-      if (cardSlot.current) {
-        gsap.killTweensOf([cardSlot.current.position, cardSlot.current.scale]);
-        cardSlot.current.position.set(LAYOUT.card[0], LAYOUT.card[1], 0);
-        cardSlot.current.scale.setScalar(LAYOUT.cardScale);
-      }
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [isActive, status]);
-
   useEffect(() => {
     if (isActive) setTheme(color === 'Maroon' ? 'maroon' : 'black');
   }, [color, isActive]);
 
   // The finale: the tag tears away, the jacket takes the center, the camera pushes in and shakes
-  // through a light-speed warp, then everything bursts into petals.
+  // through a light-speed warp, then everything bursts into petals. A reservation that was already
+  // saved lands straight on the end of it; clearing one puts the tag back.
   useEffect(() => {
-    if (status !== 'sent') return;
+    const card = cardSlot.current;
+    const slot = controlsSlot.current;
+    if (status !== 'sent') {
+      resetFinale();
+      if (slot) {
+        gsap.killTweensOf([slot.position, slot.rotation]);
+        slot.position.set(LAYOUT.controls[0], LAYOUT.controls[1], 0);
+        slot.rotation.set(0, 0, 0);
+      }
+      if (card) {
+        gsap.killTweensOf([card.position, card.scale]);
+        card.position.set(LAYOUT.card[0], LAYOUT.card[1], 0);
+        card.scale.setScalar(LAYOUT.cardScale);
+      }
+      return;
+    }
+    if (!useOrderStore.getState().celebrate) {
+      resetFinale();
+      finale.zoom = 0.35;
+      card?.position.set(CARD_CENTER, LAYOUT.restY, 0);
+      card?.scale.setScalar(1);
+      return;
+    }
     resetFinale();
     if (controlsSlot.current) {
       const slot = controlsSlot.current;
-      gsap.to(slot.position, { x: 12, y: 2, z: -4, duration: 0.7, ease: 'power3.in', onComplete: () => setPanelGone(true) });
+      gsap.to(slot.position, { x: 12, y: 2, z: -4, duration: 0.7, ease: 'power3.in', onStart: () => setPanelGone(false), onComplete: () => setPanelGone(true) });
       gsap.to(slot.rotation, { y: -1.4, z: -0.5, duration: 0.7, ease: 'power3.in' });
     }
     if (cardSlot.current) {
@@ -613,7 +637,7 @@ const JacketBrowser = () => {
       <group ref={cardSlot} position={[LAYOUT.card[0], LAYOUT.card[1], 0]} scale={LAYOUT.cardScale} visible={isActive}>
         <JacketCard />
       </group>
-      <group ref={controlsSlot} position={[LAYOUT.controls[0], LAYOUT.controls[1], 0]} visible={isActive && !panelGone}>
+      <group ref={controlsSlot} position={[LAYOUT.controls[0], LAYOUT.controls[1], 0]} visible={isActive && !tagHidden}>
         {/* Hangs from its eyelet, turned slightly toward the jacket it belongs to. */}
         <group position={[0, TAG.eyelet, 0]} rotation={[0, isMobile ? 0 : -0.08, 0]}>
           <group ref={swayRef}>

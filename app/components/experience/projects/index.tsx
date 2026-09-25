@@ -31,7 +31,11 @@ const Projects = () => {
     const timers = [
       setTimeout(() => { data.el.scrollTop = data.el.scrollHeight; }, 1500),
       setTimeout(() => usePortalStore.getState().requestPortal('projects'), 4000),
-      setTimeout(() => useOrderStore.getState().setStatus('sent', 'Paid · your receipt is in your email', 'YOURS'), 6000),
+      setTimeout(() => {
+        const { setStatus } = useOrderStore.getState();
+        setStatus('sending');
+        setStatus('sent', 'Paid · your receipt is in your email', 'YOURS');
+      }, 6000),
     ];
     return () => timers.forEach(clearTimeout);
   }, []);

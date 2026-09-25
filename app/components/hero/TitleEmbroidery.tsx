@@ -20,12 +20,15 @@ const LEFT_BRANCH: Stem[] = [
   { points: [[-12.6, -2.6, -10.3], [-10.4, -3.8, -10], [-8, -3.9, -9.8], [-6.4, -3.3, -9.6]], radius: 0.07, start: 0.3, end: 0.75, blossoms: 6, leaves: 3 },
   { points: [[-11.6, 1.2, -10], [-13.6, 3, -10.2], [-14.6, 5.4, -10.4]], radius: 0.06, start: 0.4, end: 0.8, blossoms: 5, leaves: 2 },
   { points: [[-10.2, 4.2, -9.8], [-11.2, 6.4, -9.9], [-10.6, 8, -10]], radius: 0.05, start: 0.5, end: 0.9, blossoms: 4, leaves: 2 },
+  // The trunk carries on past the corner of the screen so the branch never visibly starts.
+  { points: [[-24.5, -17.3, -11.6], [-21.2, -13.6, -11.3], [-18, -10, -11]], radius: 0.16, start: 0, end: 0.08, taper: false },
 ];
 
 const RIGHT_BRANCH: Stem[] = [
   { points: [[18, 11, -11], [14.6, 8.4, -10.6], [12.2, 6.4, -10.2], [10.6, 4.6, -10], [10, 2.8, -9.8]], radius: 0.15, start: 0.1, end: 0.6, blossoms: 8, leaves: 6 },
   { points: [[12.2, 6.4, -10.2], [10, 7.6, -10], [7.4, 7.4, -9.8], [5.8, 6.6, -9.7]], radius: 0.06, start: 0.4, end: 0.8, blossoms: 6, leaves: 3 },
   { points: [[10.6, 4.6, -10], [12.6, 3.2, -10.1], [13.6, 1, -10.2]], radius: 0.06, start: 0.5, end: 0.9, blossoms: 5, leaves: 2 },
+  { points: [[29, 19.4, -11.8], [23.4, 15.1, -11.4], [18, 11, -11]], radius: 0.15, start: 0, end: 0.1, taper: false },
 ];
 
 // The phone layout is drawn for a 9:19.5 screen; narrower or wider ones scale it about the

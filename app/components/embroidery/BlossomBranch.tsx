@@ -14,6 +14,8 @@ export interface Stem {
   end: number;
   blossoms?: number;
   leaves?: number;
+  // Off for a length of trunk that carries on off screen: full width to the end, no bud.
+  taper?: boolean;
 }
 
 interface BlossomBranchProps {
@@ -27,8 +29,9 @@ const TUBULAR = 80;
 const RADIAL = 6;
 
 // Thins a tube toward its tip so a stem finishes in a point instead of a flat cut.
-const taperedTube = (curve: THREE.Curve<THREE.Vector3>, radius: number) => {
+const taperedTube = (curve: THREE.Curve<THREE.Vector3>, radius: number, taper = true) => {
   const geometry = new THREE.TubeGeometry(curve, TUBULAR, radius, RADIAL, false);
+  if (!taper) return geometry;
   const pos = geometry.attributes.position;
   const center = new THREE.Vector3();
   const v = new THREE.Vector3();
@@ -119,7 +122,7 @@ const BlossomBranch = ({ stems, grow, seed = 7, blossomSize = 0.55 }: BlossomBra
   const built = useMemo(() => {
     const rand = seeded(seed);
     const curves = stems.map((s) => new THREE.CatmullRomCurve3(s.points.map((p) => new THREE.Vector3(...p))));
-    const geometries = curves.map((curve, i) => taperedTube(curve, stems[i].radius));
+    const geometries = curves.map((curve, i) => taperedTube(curve, stems[i].radius, stems[i].taper));
 
     // Rests a flower against the stem and a little toward the viewer so it never sinks into the wood.
     const onSurface = (curve: THREE.CatmullRomCurve3, t: number, radius: number, lift: number) => {
@@ -150,7 +153,7 @@ const BlossomBranch = ({ stems, grow, seed = 7, blossomSize = 0.55 }: BlossomBra
       }
       // Each stem finishes in a closed bud, pointing the way it was growing.
       const tangent = curve.getTangentAt(1);
-      blossoms.push({
+      if (s.taper !== false) blossoms.push({
         stem: i,
         at: 0.97,
         position: curve.getPointAt(1).add(tangent.clone().multiplyScalar(blossomSize * 0.1)),
