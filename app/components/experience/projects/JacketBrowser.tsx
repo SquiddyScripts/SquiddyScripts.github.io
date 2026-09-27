@@ -1,12 +1,12 @@
 import { Edges, Line, Text, TextProps, useTexture } from "@react-three/drei";
-import { BUY_ENABLED, checkoutEnabled, JACKET_PRICE, PAYMENT_LINK } from "@constants";
+import { BUY_ENABLED, PAYMENT_LINK } from "@constants";
 import { ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import gsap from "gsap";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isMobile } from "react-device-detect";
 import * as THREE from "three";
 
-import { cartCount, JacketColor, JacketSize, OrderField, useCartStore, useOrderStore, usePortalStore, useThemeStore } from "@stores";
+import { JacketColor, JacketSize, OrderField, useOrderStore, usePortalStore, useThemeStore } from "@stores";
 import { Petals } from "../../embroidery/Petals";
 import { finale, resetFinale } from "./finale";
 import { checkoutUrl, isEmail, sendReservation } from "../../../utils/reserve";
@@ -105,7 +105,6 @@ const pointer = {
 
 const isReady = () => {
   const { size, name, email } = useOrderStore.getState();
-  if (CART_MODE) return !!size;
   return !!size && !!name.trim() && isEmail(email);
 };
 
@@ -306,20 +305,6 @@ const useHiddenInput = () => {
   return focus;
 };
 
-// With the checkout room on, the tag only picks colorway and size; the rest happens at the counter.
-const CART_MODE = checkoutEnabled();
-
-const addToCart = () => {
-  const { color, size, setStatus } = useOrderStore.getState();
-  if (!size) {
-    setStatus('error', 'Pick a size first.');
-    return false;
-  }
-  setStatus('idle');
-  useCartStore.getState().add({ color, size, price: JACKET_PRICE });
-  return true;
-};
-
 const submit = async () => {
   const { name, email, color, size, status, setStatus } = useOrderStore.getState();
   if (status === 'sending' || status === 'sent') return;
@@ -349,18 +334,11 @@ const ReserveButton = ({ position }: { position: [number, number, number] }) => 
   const threadRef = useRef<THREE.Mesh>(null);
   const edgeRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  const [added, setAdded] = useState(false);
   const status = useOrderStore((state) => state.status);
 
   useEffect(() => {
     if (ref.current) gsap.to(ref.current.position, { z: hovered ? 0.34 : 0.2, duration: 0.3 });
   }, [hovered]);
-
-  useEffect(() => {
-    if (!added) return;
-    const timer = setTimeout(() => setAdded(false), 1400);
-    return () => clearTimeout(timer);
-  }, [added]);
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
@@ -386,16 +364,10 @@ const ReserveButton = ({ position }: { position: [number, number, number] }) => 
       gsap.to(ref.current.position, { z: 0.05, duration: 0.08 })
         .then(() => ref.current && gsap.to(ref.current.position, { z: 0.2, duration: 0.35, ease: 'back.out(3)' }));
     }
-    if (CART_MODE) {
-      if (addToCart()) setAdded(true);
-      return;
-    }
     submit();
   };
 
-  const text = CART_MODE
-    ? added ? 'ADDED' : 'ADD TO CART'
-    : status === 'sending' ? 'STITCHING' : BUY_ENABLED ? 'BUY' : 'RESERVE';
+  const text = status === 'sending' ? 'STITCHING' : BUY_ENABLED ? 'BUY' : 'RESERVE';
 
   return (
     <group position={position}>
@@ -416,42 +388,10 @@ const ReserveButton = ({ position }: { position: [number, number, number] }) => 
           <planeGeometry args={[2.5, 0.025]} />
           <meshBasicMaterial color={GOLD} />
         </mesh>
-        <Text font="./cormorant-sc.ttf" fontSize={0.28} letterSpacing={CART_MODE ? 0.12 : 0.3} color={PAPER} position={[0, 0.02, 0.11]}>
+        <Text font="./cormorant-sc.ttf" fontSize={0.28} letterSpacing={0.3} color={PAPER} position={[0, 0.02, 0.11]}>
           {text}
         </Text>
       </group>
-    </group>
-  );
-};
-
-// Where the name and email fields sit when the checkout room takes over: what's in the cart,
-// and a way through to the counter.
-const CartNote = () => {
-  const items = useCartStore((state) => state.items);
-  const count = cartCount(items);
-
-  const go = (e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation();
-    if (count > 0) useCartStore.getState().setStage('desk');
-  };
-
-  return (
-    <group position={[0, -1.3, 0]}>
-      <Text {...label} fontSize={0.12} position={[-1.25, 0.3, 0]} letterSpacing={0.2}>IN YOUR CART</Text>
-      <Text {...label} fontSize={0.15} position={[-1.25, 0, 0]} color={count ? INK : '#7A6B60'}>
-        {count ? items.map((i) => `${i.qty} × ${i.color} ${i.size}`).join(', ') : 'Nothing yet'}
-      </Text>
-      {count > 0 && (
-        <group position={[0.15, -0.42, 0]} onClick={go} {...pointer}>
-          <mesh>
-            <planeGeometry args={[2.2, 0.36]} />
-            <meshBasicMaterial color={MAROON} />
-          </mesh>
-          <Text font="./cormorant-sc.ttf" fontSize={0.15} letterSpacing={0.12} color={PAPER} position={[0, 0, 0.01]}>
-            TO THE COUNTER ›
-          </Text>
-        </group>
-      )}
     </group>
   );
 };
@@ -506,7 +446,7 @@ const Controls = () => {
       ))}
       <Text {...label} fontSize={0.12} position={[-1.25, -0.28, 0]}>{note}</Text>
 
-      {CART_MODE ? <CartNote /> : FIELDS.map((field, i) => (
+      {FIELDS.map((field, i) => (
         <Field key={field.id} field={field} onFocus={focus} position={[0, -0.95 - i * 0.78, 0]} />
       ))}
 
@@ -518,9 +458,7 @@ const Controls = () => {
         anchorY="top"
         color={status === 'error' ? MAROON : INK}
         position={[-1.25, -2.95, 0]}>
-        {status === 'error' ? message : CART_MODE
-          ? 'Ships worldwide. Pay at the counter by card or Apple Pay.'
-          : BUY_ENABLED
+        {status === 'error' ? message : BUY_ENABLED
           ? 'Secure checkout by Stripe. Ships once production wraps; I\'ll email you tracking.'
           : 'Nothing is charged now. I\'ll email you to confirm before your jacket is held.'}
       </Text>
@@ -592,7 +530,6 @@ const Reserved = () => {
 if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
   (window as unknown as { __order: typeof useOrderStore }).__order = useOrderStore;
   (window as unknown as { __portal: typeof usePortalStore }).__portal = usePortalStore;
-  (window as unknown as { __cart: typeof useCartStore }).__cart = useCartStore;
 }
 
 const JacketBrowser = () => {

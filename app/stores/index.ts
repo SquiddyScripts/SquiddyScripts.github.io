@@ -1,4 +1,3 @@
-export * from './cartStore';
 export * from './orderStore';
 export * from './portalStore';
 export * from './scrollStore';

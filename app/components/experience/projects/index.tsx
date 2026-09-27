@@ -1,18 +1,14 @@
 import { useScroll } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import gsap from "gsap";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect } from "react";
 import { isMobile } from "react-device-detect";
 import * as THREE from "three";
-import { BUY_ENABLED, checkoutEnabled } from "@constants";
-import { useCartStore, useOrderStore, usePortalStore } from "@stores";
+import { BUY_ENABLED } from "@constants";
+import { useOrderStore, usePortalStore } from "@stores";
 import TileMotif from "../../embroidery/TileMotif";
-import CartTag from "./checkout/CartTag";
-import CheckoutRoom from "./checkout/CheckoutRoom";
-import { camera as shot, leaveRoom, moveTo, swingIntoRoom, swingOutOfRoom } from "./checkout/director";
 import { finale } from "./finale";
 import JacketBrowser from "./JacketBrowser";
-import { placeCamera } from "./portalSpace";
 import { TouchPanControls } from "./TouchPanControls";
 import Warp from "./Warp";
 import Wearers from "./Wearers";
@@ -25,12 +21,7 @@ const Projects = () => {
   const { camera } = useThree();
   const isActive = usePortalStore((state) => state.activePortalId === "projects");
   const reserved = useOrderStore((state) => state.status === 'sent');
-  const stage = useCartStore((state) => state.stage);
-  const checkout = useMemo(() => checkoutEnabled(), []);
-  const inRoom = stage !== 'shop';
   const data = useScroll();
-  const anchorRef = useRef<THREE.Group>(null);
-  const lastStage = useRef(stage);
 
   // Back from Stripe with ?paid=1: land in the shop and play the finale for the purchase.
   useEffect(() => {
@@ -54,41 +45,13 @@ const Projects = () => {
     data.el.style.overflow = isActive ? 'hidden' : 'auto';
     if (isActive) {
       gsap.to(camera.position, { z: BASE_Z, y: BASE_Y, x: BASE_X, duration: 1 });
-      return;
     }
-    // Stepping out of the portal mid-checkout drops back to the shop; the cart is kept.
-    if (useCartStore.getState().stage !== 'shop') useCartStore.getState().setStage('shop');
-    leaveRoom();
-    gsap.to(camera.rotation, { z: 0, duration: 1 });
   }, [isActive]);
-
-  // The checkout director: swing round the wall on the way in, one shot per step, and back out.
-  useEffect(() => {
-    const from = lastStage.current;
-    lastStage.current = stage;
-    if (!isActive || from === stage) return;
-    if (from === 'shop') {
-      swingIntoRoom();
-      return;
-    }
-    if (stage === 'shop') {
-      swingOutOfRoom(() => {
-        camera.position.set(BASE_X, BASE_Y, BASE_Z);
-        camera.rotation.set(-Math.PI / 2, 0, 0);
-      });
-      return;
-    }
-    moveTo(stage);
-  }, [stage, isActive]);
 
   // A small look-around keeps the shop framed; the wearers on either side reward it.
   // During the finale the camera squares up on the jacket, pushes in and shakes.
   useFrame((state, delta) => {
     if (!isActive) return;
-    if (shot.active && anchorRef.current) {
-      placeCamera(camera, anchorRef.current, shot.position, shot.target);
-      return;
-    }
     if (reserved) {
       camera.rotation.y = THREE.MathUtils.damp(camera.rotation.y, 0, 6, delta);
       const t = state.clock.elapsedTime * 60;
@@ -106,14 +69,12 @@ const Projects = () => {
   });
 
   return (
-    <group ref={anchorRef}>
+    <group>
       <TileMotif id="projects" kind="blossom" label={BUY_ENABLED ? 'BUY' : 'RESERVE'} color="#140E0C" visible={!isActive} />
       <JacketBrowser />
       <Wearers />
       <Warp />
-      {checkout && <CheckoutRoom />}
-      {checkout && <CartTag />}
-      { isActive && isMobile && !reserved && !inRoom && <TouchPanControls /> }
+      { isActive && isMobile && !reserved && <TouchPanControls /> }
     </group>
   );
 };
