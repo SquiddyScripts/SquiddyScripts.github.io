@@ -4,3 +4,9 @@
 export const PAYMENT_LINK = '';
 
 export const BUY_ENABLED = PAYMENT_LINK.length > 0;
+
+// Checkout on the back of the hang tag. Off on the live site unless the address has ?checkout=1;
+// always on while developing.
+export const checkoutEnabled = () => typeof window !== 'undefined' && (
+  process.env.NODE_ENV !== 'production' || new URLSearchParams(window.location.search).has('checkout')
+);

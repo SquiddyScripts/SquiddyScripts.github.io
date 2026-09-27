@@ -1,5 +1,5 @@
 import { Edges, Line, Text, TextProps, useTexture } from "@react-three/drei";
-import { BUY_ENABLED, PAYMENT_LINK } from "@constants";
+import { BUY_ENABLED, checkoutEnabled, PAYMENT_LINK } from "@constants";
 import { ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import gsap from "gsap";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -16,6 +16,9 @@ const PAPER = '#EFE6DA';
 const GOLD = '#B8904F';
 const MAROON = '#6E2433';
 const BLACK = '#161616';
+
+// Checkout on the back of the tag: picking the jacket turns it over to a mailing label.
+const CHECKOUT = checkoutEnabled();
 
 // Set to false to hide pricing from the shop.
 const SHOW_PRICE = true;
@@ -103,9 +106,15 @@ const pointer = {
   },
 };
 
+const addressReady = () => {
+  const state = useOrderStore.getState();
+  return ADDRESS.every((f) => !!state[f.id].trim());
+};
+
 const isReady = () => {
-  const { size, name, email } = useOrderStore.getState();
-  return !!size && !!name.trim() && isEmail(email);
+  const { size, name, email, side } = useOrderStore.getState();
+  const front = !!size && !!name.trim() && isEmail(email);
+  return side === 'back' ? front && addressReady() : front;
 };
 
 // Front shows maroon, back shows black. Picking a color turns the card over; reserving spins it.
@@ -218,37 +227,58 @@ const SizeBlock = ({ size, position }: { size: typeof SIZES[number], position: [
   );
 };
 
-const FIELDS: { id: OrderField, label: string, placeholder: string }[] = [
-  { id: 'name', label: 'NAME', placeholder: 'Your name' },
-  { id: 'email', label: 'EMAIL', placeholder: 'you@email.com' },
+interface FieldSpec {
+  id: OrderField;
+  label: string;
+  placeholder: string;
+  width?: number;
+  autocomplete: string;
+}
+
+const FIELDS: FieldSpec[] = [
+  { id: 'name', label: 'NAME', placeholder: 'Your name', autocomplete: 'name' },
+  { id: 'email', label: 'EMAIL', placeholder: 'you@email.com', autocomplete: 'email' },
 ];
 
-const Field = ({ field, position, onFocus }: { field: typeof FIELDS[number], position: [number, number, number], onFocus: (id: OrderField) => void }) => {
+// The back of the tag: where the jacket is going, laid out like a mailing label.
+const ADDRESS: (FieldSpec & { x: number, y: number })[] = [
+  { id: 'line1', label: 'STREET', placeholder: '123 Blossom Lane, Apt 4', autocomplete: 'shipping street-address', x: 0, y: 0.95 },
+  { id: 'city', label: 'CITY', placeholder: 'Centreville', autocomplete: 'shipping address-level2', x: 0, y: 0.17 },
+  { id: 'region', label: 'STATE', placeholder: 'VA', autocomplete: 'shipping address-level1', width: 1.2, x: -0.65, y: -0.61 },
+  { id: 'postal', label: 'ZIP', placeholder: '20120', autocomplete: 'shipping postal-code', width: 1.2, x: 0.65, y: -0.61 },
+  { id: 'country', label: 'COUNTRY', placeholder: 'United States', autocomplete: 'shipping country-name', x: 0, y: -1.39 },
+];
+
+const AUTOCOMPLETE = Object.fromEntries([...FIELDS, ...ADDRESS].map((f) => [f.id, f.autocomplete])) as Record<OrderField, string>;
+
+const Field = ({ field, position, onFocus }: { field: FieldSpec, position: [number, number, number], onFocus: (id: OrderField) => void }) => {
   const value = useOrderStore((state) => state[field.id]);
   const focused = useOrderStore((state) => state.focused === field.id);
   const caretRef = useRef<THREE.Mesh>(null);
+  const width = field.width ?? 2.5;
+  const fits = Math.floor((width - 0.2) / 0.09);
 
   useFrame(({ clock }) => {
     if (caretRef.current) caretRef.current.visible = focused && Math.floor(clock.elapsedTime * 2) % 2 === 0;
   });
 
-  const shown = value.length > 26 ? `…${value.slice(-25)}` : value;
+  const shown = value.length > fits ? `…${value.slice(-(fits - 1))}` : value;
 
   return (
     <group position={position} onClick={(e) => { e.stopPropagation(); onFocus(field.id); }} {...pointer}>
-      <Text {...label} fontSize={0.12} position={[-1.2, 0.3, 0]} letterSpacing={0.2}>{field.label}</Text>
+      <Text {...label} fontSize={0.12} position={[-width / 2 + 0.05, 0.3, 0]} letterSpacing={0.2}>{field.label}</Text>
       <mesh>
-        <planeGeometry args={[2.5, 0.38]} />
+        <planeGeometry args={[width, 0.38]} />
         <meshBasicMaterial color="#FFF" transparent opacity={focused ? 0.8 : 0.4} />
         <Edges color={focused ? GOLD : INK} lineWidth={focused ? 2 : 1} />
       </mesh>
       <Text {...label}
         fontSize={0.15}
         color={value ? INK : '#7A6B60'}
-        position={[-1.15, 0, 0.01]}>
+        position={[-width / 2 + 0.1, 0, 0.01]}>
         {shown || field.placeholder}
       </Text>
-      <mesh ref={caretRef} position={[-1.13 + Math.min(shown.length, 26) * 0.085, 0, 0.01]}>
+      <mesh ref={caretRef} position={[-width / 2 + 0.12 + Math.min(shown.length, fits) * 0.085, 0, 0.01]}>
         <planeGeometry args={[0.012, 0.2]} />
         <meshBasicMaterial color={INK} />
       </mesh>
@@ -268,7 +298,7 @@ const useHiddenInput = () => {
     setFocused(field);
     input.type = field === 'email' ? 'email' : 'text';
     input.name = field;
-    input.autocomplete = field === 'email' ? 'email' : 'name';
+    input.autocomplete = AUTOCOMPLETE[field] as AutoFill;
     input.value = useOrderStore.getState()[field];
     input.focus({ preventScroll: true });
   };
@@ -293,7 +323,11 @@ const useHiddenInput = () => {
     input.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
-      if (useOrderStore.getState().focused === 'name') focus('email');
+      // Enter walks down the side of the tag that's showing, then lets go at the end of it.
+      const { focused, side } = useOrderStore.getState();
+      const order = side === 'back' ? ADDRESS.map((f) => f.id) : ['name', 'email'] as OrderField[];
+      const next = focused ? order[order.indexOf(focused) + 1] : undefined;
+      if (next) focus(next);
       else input.blur();
     });
     input.addEventListener('blur', () => setFocused(null));
@@ -312,8 +346,31 @@ const submit = async () => {
   if (!name.trim()) return setStatus('error', 'Add your name.');
   if (!isEmail(email)) return setStatus('error', 'Check the email address.');
 
+  const state = useOrderStore.getState();
+  if (CHECKOUT) {
+    if (state.side === 'front') {
+      if (status === 'error') setStatus('idle');
+      state.setSide('back');
+      return;
+    }
+    const missing = ADDRESS.find((f) => !state[f.id].trim());
+    if (missing) return setStatus('error', `Add the ${missing.label.toLowerCase()}.`);
+  }
+
   setStatus('sending');
-  const order = { name: name.trim(), email: email.trim(), color, size };
+  const shipTo = CHECKOUT
+    ? [state.line1, `${state.city}, ${state.region} ${state.postal}`, state.country].map((s) => s.trim()).join(' · ')
+    : undefined;
+  const order = { name: name.trim(), email: email.trim(), color, size, shipTo };
+  if (CHECKOUT && !BUY_ENABLED) {
+    try {
+      await sendReservation({ ...order, intent: 'order' });
+      setStatus('sent', `${color} · ${size} · to ${state.city.trim()}`, 'ORDERED');
+    } catch {
+      setStatus('error', 'Didn\'t send. Email amaaninva@gmail.com instead.');
+    }
+    return;
+  }
   if (BUY_ENABLED) {
     // The heads-up email must not hold up the trip to checkout.
     sendReservation({ ...order, intent: 'checkout' }).catch(() => {});
@@ -367,7 +424,10 @@ const ReserveButton = ({ position }: { position: [number, number, number] }) => 
     submit();
   };
 
-  const text = status === 'sending' ? 'STITCHING' : BUY_ENABLED ? 'BUY' : 'RESERVE';
+  const side = useOrderStore((state) => state.side);
+  const text = status === 'sending' ? 'STITCHING'
+    : CHECKOUT ? side === 'front' ? 'CHECKOUT' : BUY_ENABLED ? 'PAY' : 'PLACE ORDER'
+      : BUY_ENABLED ? 'BUY' : 'RESERVE';
 
   return (
     <group position={position}>
@@ -388,7 +448,7 @@ const ReserveButton = ({ position }: { position: [number, number, number] }) => 
           <planeGeometry args={[2.5, 0.025]} />
           <meshBasicMaterial color={GOLD} />
         </mesh>
-        <Text font="./cormorant-sc.ttf" fontSize={0.28} letterSpacing={0.3} color={PAPER} position={[0, 0.02, 0.11]}>
+        <Text font="./cormorant-sc.ttf" fontSize={0.28} letterSpacing={text.length > 8 ? 0.14 : 0.3} color={PAPER} position={[0, 0.02, 0.11]}>
           {text}
         </Text>
       </group>
@@ -396,35 +456,170 @@ const ReserveButton = ({ position }: { position: [number, number, number] }) => 
   );
 };
 
+// Gold stitching round the edge and the punched eyelet; both faces of the tag have them.
+const TagEdge = ({ stitch }: { stitch: THREE.Vector3[] }) => (
+  <>
+    <Line points={stitch} color={GOLD} lineWidth={1.4} dashed dashSize={0.09} gapSize={0.06} position={[0, 0, -0.07]} />
+    <mesh position={[0, TAG.eyelet, -0.06]}>
+      <ringGeometry args={[0.085, 0.14, 28]} />
+      <meshBasicMaterial color={GOLD} />
+    </mesh>
+    <mesh position={[0, TAG.eyelet, -0.065]}>
+      <circleGeometry args={[0.085, 24]} />
+      <meshBasicMaterial color={INK} />
+    </mesh>
+  </>
+);
+
 const Controls = () => {
-  const size = useOrderStore((state) => state.size);
-  const status = useOrderStore((state) => state.status);
-  const message = useOrderStore((state) => state.message);
+  const side = useOrderStore((state) => state.side);
   const focus = useHiddenInput();
-  const note = SIZES.find((s) => s.id === size)?.note ?? 'Medium is the sample size';
-  const top = SHOW_PRICE ? 0.22 : 0;
+  const flipRef = useRef<THREE.Group>(null);
+  const [face, setFace] = useState(side);
   const tag = useMemo(() => ({
     body: new THREE.ShapeGeometry(tagShape(0)),
     stitch: tagShape(0.12).getPoints().map((p) => new THREE.Vector3(p.x, p.y, 0)),
   }), []);
 
+  // Turned over on its string: a half turn, lifted off the jacket a little on the way round.
+  // Each face only exists while it's the one showing.
+  useEffect(() => {
+    const flip = flipRef.current;
+    if (!flip) return;
+    const target = side === 'back' ? Math.PI : 0;
+    const tl = gsap.timeline();
+    tl.to(flip.rotation, {
+      y: target,
+      duration: 0.9,
+      ease: 'power3.inOut',
+      onUpdate: () => setFace(flip.rotation.y > Math.PI / 2 ? 'back' : 'front'),
+    }, 0)
+      .to(flip.position, { z: 0.6, duration: 0.45, ease: 'power2.out' }, 0)
+      .to(flip.position, { z: 0, duration: 0.45, ease: 'power2.in' }, 0.45);
+    return () => { tl.kill(); };
+  }, [side]);
+
   return (
     <group>
-      <mesh geometry={tag.body} position={[0, 0, -0.08]}>
-        <meshBasicMaterial color={PAPER} side={THREE.DoubleSide} />
-      </mesh>
       <mesh geometry={tag.body} position={[0.06, -0.08, -0.12]}>
         <meshBasicMaterial color="#000" transparent opacity={0.28} depthWrite={false} />
       </mesh>
-      <Line points={tag.stitch} color={GOLD} lineWidth={1.4} dashed dashSize={0.09} gapSize={0.06} position={[0, 0, -0.07]} />
-      <mesh position={[0, TAG.eyelet, -0.06]}>
-        <ringGeometry args={[0.085, 0.14, 28]} />
-        <meshBasicMaterial color={GOLD} />
-      </mesh>
-      <mesh position={[0, TAG.eyelet, -0.065]}>
-        <circleGeometry args={[0.085, 24]} />
-        <meshBasicMaterial color={INK} />
-      </mesh>
+      <group ref={flipRef}>
+        <mesh geometry={tag.body} position={[0, 0, -0.08]}>
+          <meshBasicMaterial color={PAPER} side={THREE.DoubleSide} />
+        </mesh>
+        {face === 'front' ? (
+          <group>
+            <TagEdge stitch={tag.stitch} />
+            <TagFront focus={focus} />
+          </group>
+        ) : (
+          <group position={[0, 0, -0.16]} rotation-y={Math.PI}>
+            <TagEdge stitch={tag.stitch} />
+            <TagBack focus={focus} />
+          </group>
+        )}
+      </group>
+    </group>
+  );
+};
+
+// A little postage stamp for the corner of the label, with the sleeve's plum blossom on it.
+const Stamp = ({ position }: { position: [number, number, number] }) => (
+  <group position={position} rotation-z={0.06}>
+    <mesh>
+      <planeGeometry args={[0.52, 0.62]} />
+      <meshBasicMaterial color="#E6A0A6" />
+    </mesh>
+    <Line points={[[-0.22, -0.27, 0.001], [0.22, -0.27, 0.001], [0.22, 0.27, 0.001], [-0.22, 0.27, 0.001], [-0.22, -0.27, 0.001]]}
+      color={PAPER} lineWidth={1} dashed dashSize={0.03} gapSize={0.02} />
+    {[0, 1, 2, 3, 4].map((i) => {
+      const a = (i / 5) * Math.PI * 2 + Math.PI / 2;
+      return (
+        <mesh key={i} position={[Math.cos(a) * 0.07, 0.05 + Math.sin(a) * 0.07, 0.002]}>
+          <circleGeometry args={[0.055, 14]} />
+          <meshBasicMaterial color={MAROON} />
+        </mesh>
+      );
+    })}
+    <mesh position={[0, 0.05, 0.003]}>
+      <circleGeometry args={[0.03, 12]} />
+      <meshBasicMaterial color={GOLD} />
+    </mesh>
+    <Text font="./cormorant-sc.ttf" fontSize={0.07} color={MAROON} position={[0, -0.18, 0.002]} letterSpacing={0.1}>
+      {SHOW_PRICE ? '$150' : 'POST'}
+    </Text>
+  </group>
+);
+
+// The back of the tag is the mailing label. Whatever's typed prints onto it.
+const TagBack = ({ focus }: { focus: (id: OrderField) => void }) => {
+  const name = useOrderStore((state) => state.name);
+  const color = useOrderStore((state) => state.color);
+  const size = useOrderStore((state) => state.size);
+  const status = useOrderStore((state) => state.status);
+  const message = useOrderStore((state) => state.message);
+
+  const back = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    const { status: now, setStatus, setSide } = useOrderStore.getState();
+    if (now === 'sending') return;
+    if (now === 'error') setStatus('idle');
+    setSide('front');
+  };
+
+  return (
+    <group>
+      <Text font="./cormorant-italic.ttf" fontSize={0.13} color={MAROON} anchorX="center" position={[0, TAG.eyelet - 0.46, 0]}>
+        leaving the studio, stitched by hand
+      </Text>
+      <Text font="./cormorant-sc.ttf" fontSize={0.3} color={INK} anchorX="left" letterSpacing={0.06} position={[-1.25, 2.2, 0]}>
+        Where is it
+      </Text>
+      <Text font="./cormorant-sc.ttf" fontSize={0.3} color={INK} anchorX="left" letterSpacing={0.06} position={[-1.25, 1.88, 0]}>
+        going?
+      </Text>
+      <Stamp position={[0.95, 2.05, 0]} />
+      <Text {...label} fontSize={0.12} position={[-1.25, 1.52, 0]} letterSpacing={0.2}>SHIP TO</Text>
+      <Text {...label} fontSize={0.17} position={[-0.3, 1.52, 0]}>{name.trim() || 'Your name'}</Text>
+
+      {ADDRESS.map((field) => (
+        <Field key={field.id} field={field} onFocus={focus} position={[field.x, field.y, 0]} />
+      ))}
+
+      <Line points={[[-1.25, -1.8, 0], [1.25, -1.8, 0]]} color={GOLD} lineWidth={1} dashed dashSize={0.06} gapSize={0.04} />
+      <Text {...label} fontSize={0.1} position={[-1.25, -1.95, 0]} letterSpacing={0.14}>
+        {`CONTENTS  1 JACKET · ${color.toUpperCase()} · ${size?.[0] ?? '–'}`}
+      </Text>
+
+      <ReserveButton position={[0, -2.32, 0]} />
+      <Text {...label}
+        fontSize={0.1}
+        maxWidth={2.6}
+        anchorY="top"
+        color={status === 'error' ? MAROON : INK}
+        position={[-1.25, -2.75, 0]}>
+        {status === 'error' ? message : BUY_ENABLED
+          ? 'Card or Apple Pay next, secured by Stripe.'
+          : 'Nothing is charged yet. I\'ll email to settle up.'}
+      </Text>
+      <Text font="./cormorant-sc.ttf" fontSize={0.13} color={MAROON} letterSpacing={0.2} anchorX="left" position={[-1.25, -3.02, 0]}
+        onClick={back} {...pointer}>
+        ‹ TURN THE TAG BACK
+      </Text>
+    </group>
+  );
+};
+
+const TagFront = ({ focus }: { focus: (id: OrderField) => void }) => {
+  const size = useOrderStore((state) => state.size);
+  const status = useOrderStore((state) => state.status);
+  const message = useOrderStore((state) => state.message);
+  const note = SIZES.find((s) => s.id === size)?.note ?? 'Medium is the sample size';
+  const top = SHOW_PRICE ? 0.22 : 0;
+
+  return (
+    <group>
       <Text font="./cormorant-italic.ttf" fontSize={0.13} color={MAROON} anchorX="center" position={[0, TAG.eyelet - 0.46, 0]}>
         by Amaan S. Khan · one of 100
       </Text>
@@ -458,9 +653,11 @@ const Controls = () => {
         anchorY="top"
         color={status === 'error' ? MAROON : INK}
         position={[-1.25, -2.95, 0]}>
-        {status === 'error' ? message : BUY_ENABLED
-          ? 'Secure checkout by Stripe. Ships once production wraps; I\'ll email you tracking.'
-          : 'Nothing is charged now. I\'ll email you to confirm before your jacket is held.'}
+        {status === 'error' ? message : CHECKOUT
+          ? 'Turn the tag over to tell me where it\'s going.'
+          : BUY_ENABLED
+            ? 'Secure checkout by Stripe. Ships once production wraps; I\'ll email you tracking.'
+            : 'Nothing is charged now. I\'ll email you to confirm before your jacket is held.'}
       </Text>
     </group>
   );

@@ -7,6 +7,7 @@ interface Reservation {
   email: string;
   color: JacketColor;
   size: JacketSize;
+  shipTo?: string;
 }
 
 // Stripe carries the colorway, size and name through checkout in client_reference_id, which
@@ -18,7 +19,7 @@ export const checkoutUrl = (link: string, { name, email, color, size }: Reservat
   return url.toString();
 };
 
-export const sendReservation = async ({ name, email, color, size, intent = 'reservation' }: Reservation & { intent?: 'reservation' | 'checkout' }) => {
+export const sendReservation = async ({ name, email, color, size, shipTo, intent = 'reservation' }: Reservation & { intent?: 'reservation' | 'checkout' | 'order' }) => {
   const response = await fetch(`https://formsubmit.co/ajax/${ORDER_EMAIL}`, {
     method: 'POST',
     headers: {
@@ -28,13 +29,16 @@ export const sendReservation = async ({ name, email, color, size, intent = 'rese
     body: JSON.stringify({
       _subject: intent === 'checkout'
         ? `Confessions checkout started: ${color} ${size}`
-        : `Confessions reservation: ${color} ${size}`,
+        : intent === 'order'
+          ? `Confessions order: ${color} ${size}`
+          : `Confessions reservation: ${color} ${size}`,
       _template: 'table',
       _captcha: 'false',
       name,
       email,
       color,
       size,
+      ...(shipTo ? { ship_to: shipTo } : {}),
     }),
   });
   if (!response.ok) throw new Error(`Reservation failed with ${response.status}`);

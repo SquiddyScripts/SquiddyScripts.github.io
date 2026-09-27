@@ -97,6 +97,15 @@ const GridTile = (props: GridTileProps) => {
       })
     }
     document.body.addEventListener('keydown', handleEscape);
+    // The scroll only tilts the camera down while no portal is open, so opening one before it has
+    // finished settling (the footer link, a quick tap) would leave it staring into the dark.
+    gsap.to(camera.rotation, {
+      x: -Math.PI / 2,
+      y: 0,
+      z: 0,
+      duration: 0.8,
+      ease: 'power2.out',
+    });
     gsap.to(portalRef.current, {
       blend: 1,
       duration: 0.5,
