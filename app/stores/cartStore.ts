@@ -41,6 +41,7 @@ interface CartStore {
   setField: (field: number) => void;
   complete: (orderNumber: number) => void;
   reset: () => void;
+  clear: () => void;
 }
 
 const EMPTY_ADDRESS: Address = { name: '', line1: '', line2: '', city: '', region: '', postal: '', country: 'United States', email: '' };
@@ -62,7 +63,8 @@ export const useCartStore = create<CartStore>()(persist((set) => ({
   setAddress: (field, value) => set((state) => ({ address: { ...state.address, [field]: value } })),
   setField: (field) => set(() => ({ field })),
   complete: (orderNumber) => set(() => ({ orderNumber, stage: 'receipt' })),
-  reset: () => set(() => ({ items: [], stage: 'shop', field: 0, orderNumber: null })),
+  reset: () => set(() => ({ stage: 'shop' })),
+  clear: () => set(() => ({ items: [], field: 0, orderNumber: null })),
 }), {
   name: 'confessions-cart',
   storage: createJSONStorage(() => localStorage),
