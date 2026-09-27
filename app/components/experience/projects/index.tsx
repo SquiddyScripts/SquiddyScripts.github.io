@@ -9,7 +9,7 @@ import { useCartStore, useOrderStore, usePortalStore } from "@stores";
 import TileMotif from "../../embroidery/TileMotif";
 import CartTag from "./checkout/CartTag";
 import CheckoutRoom from "./checkout/CheckoutRoom";
-import { camera as shot, leaveRoom, moveTo, swingIntoRoom, swingOutOfRoom, WALL_X } from "./checkout/director";
+import { camera as shot, leaveRoom, moveTo, swingIntoRoom, swingOutOfRoom } from "./checkout/director";
 import { finale } from "./finale";
 import JacketBrowser from "./JacketBrowser";
 import { placeCamera } from "./portalSpace";
@@ -30,10 +30,7 @@ const Projects = () => {
   const inRoom = stage !== 'shop';
   const data = useScroll();
   const anchorRef = useRef<THREE.Group>(null);
-  const wearersRef = useRef<THREE.Group>(null);
   const lastStage = useRef(stage);
-  const hasCart = useCartStore((state) => state.items.length > 0);
-  const eased = useRef({ position: new THREE.Vector3(), target: new THREE.Vector3(), live: false });
 
   // Back from Stripe with ?paid=1: land in the shop and play the finale for the purchase.
   useEffect(() => {
@@ -60,9 +57,7 @@ const Projects = () => {
       return;
     }
     // Stepping out of the portal mid-checkout drops back to the shop; the cart is kept.
-    const cart = useCartStore.getState();
-    if (cart.stage !== 'shop') cart.setStage('shop');
-    if (cart.orderNumber !== null) cart.clear();
+    if (useCartStore.getState().stage !== 'shop') useCartStore.getState().setStage('shop');
     leaveRoom();
     gsap.to(camera.rotation, { z: 0, duration: 1 });
   }, [isActive]);
@@ -80,8 +75,6 @@ const Projects = () => {
       swingOutOfRoom(() => {
         camera.position.set(BASE_X, BASE_Y, BASE_Z);
         camera.rotation.set(-Math.PI / 2, 0, 0);
-        const cart = useCartStore.getState();
-        if (cart.orderNumber !== null) cart.clear();
       });
       return;
     }
@@ -91,23 +84,11 @@ const Projects = () => {
   // A small look-around keeps the shop framed; the wearers on either side reward it.
   // During the finale the camera squares up on the jacket, pushes in and shakes.
   useFrame((state, delta) => {
-    // The wearers belong to the shop; once the camera is round the screen they'd only float in the dark.
-    if (wearersRef.current) wearersRef.current.visible = !(shot.active && shot.position.x > WALL_X);
     if (!isActive) return;
     if (shot.active && anchorRef.current) {
-      // Critically damped chase of the planned shot: any hitch in frame time is absorbed, never shown.
-      if (!eased.current.live) {
-        eased.current.position.copy(shot.position);
-        eased.current.target.copy(shot.target);
-        eased.current.live = true;
-      }
-      const k = 1 - Math.exp(-9 * Math.min(delta, 0.05));
-      eased.current.position.lerp(shot.position, k);
-      eased.current.target.lerp(shot.target, k);
-      placeCamera(camera, anchorRef.current, eased.current.position, eased.current.target);
+      placeCamera(camera, anchorRef.current, shot.position, shot.target);
       return;
     }
-    eased.current.live = false;
     if (reserved) {
       camera.rotation.y = THREE.MathUtils.damp(camera.rotation.y, 0, 6, delta);
       const t = state.clock.elapsedTime * 60;
@@ -128,11 +109,9 @@ const Projects = () => {
     <group ref={anchorRef}>
       <TileMotif id="projects" kind="blossom" label={BUY_ENABLED ? 'BUY' : 'RESERVE'} color="#140E0C" visible={!isActive} />
       <JacketBrowser />
-      <group ref={wearersRef}>
-        <Wearers />
-      </group>
+      <Wearers />
       <Warp />
-      {checkout && (hasCart || inRoom) && <CheckoutRoom />}
+      {checkout && <CheckoutRoom />}
       {checkout && <CartTag />}
       { isActive && isMobile && !reserved && !inRoom && <TouchPanControls /> }
     </group>
